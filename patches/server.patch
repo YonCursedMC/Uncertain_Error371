@@ -1204,7 +1204,7 @@
  	public List getCollidingBoundingBoxes(Entity var1, AxisAlignedBB var2) {
  		this.collidingBoundingBoxes.clear();
  		int var3 = MathHelper.floor_double(var2.minX);
-@@ -947,6 +1047,80 @@
+@@ -947,6 +1047,113 @@
  		return (int)(var3 * 11.0F);
  	}
  
@@ -1279,13 +1279,46 @@
 +			var12 = var12 * (1.0F - var15) + 1.0F * var15;
 +		}
 +
++		// Error 371: ランダムな空の色の異常・グリッチ変異演出
++		long timeSec = this.getWorldTime() / 10L; // 約3秒ごとに空の色が変化
++		java.util.Random skyRand = new java.util.Random(timeSec * 314159265L + (long)(var5 / 64) * 1000L + (long)(var6 / 64));
++		if (skyRand.nextInt(100) < 65) { // 65%の確率で空の色が奇妙に変異
++			int glitchType = skyRand.nextInt(6);
++			if (glitchType == 0) { // 鮮血の赤空 (Blood Red)
++				var10 = var10 * 0.2F + 0.85F;
++				var11 *= 0.05F;
++				var12 *= 0.05F;
++			} else if (glitchType == 1) { // 虚無の紫空 (Void Purple)
++				var10 = var10 * 0.3F + 0.6F;
++				var11 *= 0.05F;
++				var12 = var12 * 0.3F + 0.8F;
++			} else if (glitchType == 2) { // ネオングリッチグリーン (Glitch Cyan/Green)
++				var10 *= 0.05F;
++				var11 = var11 * 0.2F + 0.85F;
++				var12 = var12 * 0.2F + 0.6F;
++			} else if (glitchType == 3) { // 色彩反転・漆黒空 (Inverted / Pitch Black)
++				var10 = Math.max(0.02F, (1.0F - var10) * 0.15F);
++				var11 = Math.max(0.02F, (1.0F - var11) * 0.15F);
++				var12 = Math.max(0.02F, (1.0F - var12) * 0.15F);
++			} else if (glitchType == 4) { // 黄濁ノイズ空 (Corrupted Yellow)
++				var10 = var10 * 0.2F + 0.9F;
++				var11 = var11 * 0.2F + 0.85F;
++				var12 *= 0.05F;
++			} else if (glitchType == 5) { // 高速カラーフリッカー (Rapid Color Glitch Noise)
++				java.util.Random flickerRand = new java.util.Random(this.getWorldTime() * 99999L);
++				var10 = flickerRand.nextFloat();
++				var11 = flickerRand.nextFloat();
++				var12 = flickerRand.nextFloat();
++			}
++		}
++
 +		return this.getWorldVec3Pool().getVecFromPool((double)var10, (double)var11, (double)var12);
 +	}
 +
  	public float getCelestialAngle(float var1) {
  		return this.provider.calculateCelestialAngle(this.worldInfo.getWorldTime(), var1);
  	}
-@@ -960,6 +1134,50 @@
+@@ -960,6 +1167,50 @@
  		return var2 * (float)Math.PI * 2.0F;
  	}
  
@@ -1336,7 +1369,7 @@
  	public int getPrecipitationHeight(int var1, int var2) {
  		return this.getChunkFromBlockCoords(var1, var2).getPrecipitationHeight(var1 & 15, var2 & 15);
  	}
-@@ -979,6 +1197,20 @@
+@@ -979,6 +1230,20 @@
  		return -1;
  	}
  
@@ -1357,7 +1390,7 @@
  	public void scheduleBlockUpdate(int var1, int var2, int var3, int var4, int var5) {
  	}
  
-@@ -1492,6 +1724,14 @@
+@@ -1492,6 +1757,14 @@
  		}
  	}
  
@@ -1372,7 +1405,7 @@
  	public TileEntity getBlockTileEntity(int var1, int var2, int var3) {
  		if(var2 >= 0 && var2 < 256) {
  			TileEntity var4 = null;
-@@ -1638,6 +1878,9 @@
+@@ -1638,6 +1911,9 @@
  
  	public void tick() {
  		this.updateWeather();
@@ -1382,7 +1415,7 @@
  	}
  
  	private void calculateInitialWeather() {
-@@ -2082,6 +2325,10 @@
+@@ -2082,6 +2358,10 @@
  
  	public abstract Entity getEntityByID(int var1);
  
@@ -1393,7 +1426,7 @@
  	public void updateTileEntityChunkAndDoNothing(int var1, int var2, int var3, TileEntity var4) {
  		if(this.blockExists(var1, var2, var3)) {
  			this.getChunkFromBlockCoords(var1, var3).setChunkModified();
-@@ -2307,10 +2554,17 @@
+@@ -2307,10 +2587,17 @@
  		return null;
  	}
  
@@ -1411,7 +1444,7 @@
  	public long getSeed() {
  		return this.worldInfo.getSeed();
  	}
-@@ -2331,6 +2585,27 @@
+@@ -2331,6 +2618,27 @@
  		return new ChunkCoordinates(this.worldInfo.getSpawnX(), this.worldInfo.getSpawnY(), this.worldInfo.getSpawnZ());
  	}
  
@@ -1439,7 +1472,7 @@
  	public boolean canMineBlock(EntityPlayer var1, int var2, int var3, int var4) {
  		return true;
  	}
-@@ -2372,6 +2647,11 @@
+@@ -2372,6 +2680,11 @@
  		return this.prevRainingStrength + (this.rainingStrength - this.prevRainingStrength) * var1;
  	}
  
@@ -1451,7 +1484,7 @@
  	public boolean isThundering() {
  		return (double)this.getWeightedThunderStrength(1.0F) > 0.9D;
  	}
-@@ -2460,6 +2740,14 @@
+@@ -2460,6 +2773,14 @@
  		return this.getChunkProvider().findClosestStructure(this, var1, var2, var3, var4);
  	}
  
@@ -1466,7 +1499,7 @@
  	public CrashReportCategory addWorldInfoToCrashReport(CrashReport var1) {
  		CrashReportCategory var2 = var1.makeCategoryDepth("Affected level", 1);
  		var2.addCrashSection("Level name", this.worldInfo == null ? "????" : this.worldInfo.getWorldName());
-@@ -2493,6 +2781,9 @@
+@@ -2493,6 +2814,9 @@
  		}
  
  		return this.theCalendar;
