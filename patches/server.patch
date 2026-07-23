@@ -1,0 +1,3521 @@
+--- /dev/null
++++ net/minecraft/src/Entity371.java
+@@ -1,0 +1,221 @@
++package net.minecraft.src;
++
++public abstract class Entity371 extends EntityCreature implements IAnimals {
++	public Entity371(World var1) {
++		super(var1);
++		this.experienceValue = 5;
++	}
++
++	public void onLivingUpdate() {
++		super.onLivingUpdate();
++	}
++
++	public void onUpdate() {
++		super.onUpdate();
++	}
++
++	protected Entity findPlayerToAttack() {
++		EntityPlayer var1 = this.worldObj.getClosestVulnerablePlayerToEntity(this, 64.0D);
++		return var1 != null && this.canEntityBeSeen(var1) ? var1 : null;
++	}
++
++	public boolean attackEntityFrom(DamageSource var1, int var2) {
++		if(this.isEntityInvulnerable()) {
++			return false;
++		} else if(super.attackEntityFrom(var1, var2)) {
++			Entity var3 = var1.getEntity();
++			if(this.riddenByEntity != var3 && this.ridingEntity != var3) {
++				if(var3 != this) {
++					this.entityToAttack = var3;
++				}
++
++				return true;
++			} else {
++				return true;
++			}
++		} else {
++			return false;
++		}
++	}
++
++	public boolean attackEntityAsMob(Entity var1) {
++		int var2 = this.getAttackStrength(var1);
++		if(this.isPotionActive(Potion.damageBoost)) {
++			var2 += 3 << this.getActivePotionEffect(Potion.damageBoost).getAmplifier();
++		}
++
++		if(this.isPotionActive(Potion.weakness)) {
++			var2 -= 2 << this.getActivePotionEffect(Potion.weakness).getAmplifier();
++		}
++
++		int var3 = 0;
++		if(var1 instanceof EntityLiving) {
++			var2 += EnchantmentHelper.getEnchantmentModifierLiving(this, (EntityLiving)var1);
++			var3 += EnchantmentHelper.getKnockbackModifier(this, (EntityLiving)var1);
++		}
++
++		boolean var4 = var1.attackEntityFrom(DamageSource.causeMobDamage(this), var2);
++		if(var4) {
++			if(var3 > 0) {
++				var1.addVelocity((double)(-MathHelper.sin(this.rotationYaw * (float)Math.PI / 180.0F) * (float)var3 * 0.5F), 0.1D, (double)(MathHelper.cos(this.rotationYaw * (float)Math.PI / 180.0F) * (float)var3 * 0.5F));
++				this.motionX *= 0.6D;
++				this.motionZ *= 0.6D;
++			}
++
++			int var5 = EnchantmentHelper.getFireAspectModifier(this);
++			if(var5 > 0) {
++				var1.setFire(var5 * 4);
++			}
++
++			if(var1 instanceof EntityLiving) {
++				EnchantmentThorns.func_92096_a(this, (EntityLiving)var1, this.rand);
++			}
++		}
++
++		return var4;
++	}
++
++	protected void attackEntity(Entity var1, float var2) {
++		if(this.attackTime <= 0 && var2 < 2.0F && var1.boundingBox.maxY > this.boundingBox.minY && var1.boundingBox.minY < this.boundingBox.maxY) {
++			this.attackTime = 20;
++			this.attackEntityAsMob(var1);
++		}
++
++	}
++
++	public float getBlockPathWeight(int var1, int var2, int var3) {
++		return 0.5F - this.worldObj.getLightBrightness(var1, var2, var3);
++	}
++
++	protected boolean isValidLightLevel() {
++		int var1 = MathHelper.floor_double(this.posX);
++		int var2 = MathHelper.floor_double(this.boundingBox.minY);
++		int var3 = MathHelper.floor_double(this.posZ);
++		if(this.worldObj.getSavedLightValue(EnumSkyBlock.Sky, var1, var2, var3) > this.rand.nextInt(32)) {
++			return false;
++		} else {
++			int var4 = this.worldObj.getBlockLightValue(var1, var2, var3);
++			if(this.worldObj.isThundering()) {
++				int var5 = this.worldObj.skylightSubtracted;
++				this.worldObj.skylightSubtracted = 10;
++				var4 = this.worldObj.getBlockLightValue(var1, var2, var3);
++				this.worldObj.skylightSubtracted = var5;
++			}
++
++			return var4 <= this.rand.nextInt(8);
++		}
++	}
++
++	public boolean getCanSpawnHere() {
++		int var1 = MathHelper.floor_double(this.posX);
++		int var2 = MathHelper.floor_double(this.boundingBox.minY);
++		int var3 = MathHelper.floor_double(this.posZ);
++		int blockId = this.worldObj.getBlockId(var1, var2 - 1, var3);
++		return (blockId == Block.grass.blockID || blockId == Block.dirt.blockID) && super.getCanSpawnHere();
++	}
++	
++	public int getAttackStrength(Entity var1) {
++		return 2;
++	}
++
++	protected void updateEntityActionState() {
++		this.worldObj.theProfiler.startSection("ai");
++		if(this.fleeingTick > 0) {
++			--this.fleeingTick;
++		}
++
++		this.hasAttacked = this.isMovementCeased();
++		float var1 = 16.0F;
++		if(this.entityToAttack == null) {
++			this.entityToAttack = this.findPlayerToAttack();
++			if(this.entityToAttack != null) {
++				this.pathToEntity = this.worldObj.getPathEntityToEntity(this, this.entityToAttack, var1, true, false, false, true);
++			}
++		} else if(this.entityToAttack.isEntityAlive()) {
++			float var2 = this.entityToAttack.getDistanceToEntity(this);
++			if(this.canEntityBeSeen(this.entityToAttack)) {
++				this.attackEntity(this.entityToAttack, var2);
++			}
++		} else {
++			this.entityToAttack = null;
++		}
++
++		this.worldObj.theProfiler.endSection();
++		if(this.hasAttacked || this.entityToAttack == null || this.pathToEntity != null && this.rand.nextInt(20) != 0) {
++			if(!this.hasAttacked && (this.pathToEntity == null && this.rand.nextInt(180) == 0 || this.rand.nextInt(120) == 0 || this.fleeingTick > 0) && this.entityAge < 100) {
++				this.updateWanderPath();
++			}
++		} else {
++			this.pathToEntity = this.worldObj.getPathEntityToEntity(this, this.entityToAttack, var1, true, false, false, true);
++		}
++
++		int var21 = MathHelper.floor_double(this.boundingBox.minY + 0.5D);
++		boolean var3 = this.isInWater();
++		boolean var4 = this.handleLavaMovement();
++		this.rotationPitch = 0.0F;
++		if(this.pathToEntity != null && this.rand.nextInt(100) != 0) {
++			this.worldObj.theProfiler.startSection("followpath");
++			Vec3 var5 = this.pathToEntity.getPosition(this);
++			double var6 = (double)(this.width * 2.0F);
++
++			while(var5 != null && var5.squareDistanceTo(this.posX, var5.yCoord, this.posZ) < var6 * var6) {
++				this.pathToEntity.incrementPathIndex();
++				if(this.pathToEntity.isFinished()) {
++					var5 = null;
++					this.pathToEntity = null;
++				} else {
++					var5 = this.pathToEntity.getPosition(this);
++				}
++			}
++
++			this.isJumping = false;
++			if(var5 != null) {
++				double var8 = var5.xCoord - this.posX;
++				double var10 = var5.zCoord - this.posZ;
++				double var12 = var5.yCoord - (double)var21;
++				float var14 = (float)(Math.atan2(var10, var8) * 180.0D / (double)((float)Math.PI)) - 90.0F;
++				float var15 = MathHelper.wrapAngleTo180_float(var14 - this.rotationYaw);
++				this.moveForward = this.moveSpeed;
++				if(var15 > 30.0F) {
++					var15 = 30.0F;
++				}
++
++				if(var15 < -30.0F) {
++					var15 = -30.0F;
++				}
++
++				this.rotationYaw += var15;
++				if(this.hasAttacked && this.entityToAttack != null) {
++					double var16 = this.entityToAttack.posX - this.posX;
++					double var18 = this.entityToAttack.posZ - this.posZ;
++					float var20 = this.rotationYaw;
++					this.rotationYaw = (float)(Math.atan2(var18, var16) * 180.0D / (double)((float)Math.PI)) - 90.0F;
++					var15 = (var20 - this.rotationYaw + 90.0F) * (float)Math.PI / 180.0F;
++					this.moveStrafing = -MathHelper.sin(var15) * this.moveForward * 1.0F;
++					this.moveForward = MathHelper.cos(var15) * this.moveForward * 1.0F;
++				}
++
++				if(var12 > 0.0D) {
++					this.isJumping = true;
++				}
++			}
++
++			if(this.entityToAttack != null) {
++				this.faceEntity(this.entityToAttack, 30.0F, 30.0F);
++			}
++
++			if(this.isCollidedHorizontally && !this.hasPath()) {
++				this.isJumping = true;
++			}
++
++			if(this.rand.nextFloat() < 0.8F && (var3 || var4)) {
++				this.isJumping = true;
++			}
++
++			this.worldObj.theProfiler.endSection();
++		} else {
++			super.updateEntityActionState();
++			this.pathToEntity = null;
++		}
++	}
++}
+--- net/minecraft/src/DedicatedServer.java
++++ net/minecraft/src/DedicatedServer.java
+@@ -30,7 +30,7 @@
+ 		DedicatedServerCommandThread var1 = new DedicatedServerCommandThread(this);
+ 		var1.setDaemon(true);
+ 		var1.start();
+-		this.getLogAgent().logInfo("Starting minecraft server version 1.5.2");
++		this.getLogAgent().logInfo("Starting minecraft server version Uncertain Error 371");
+ 		if(Runtime.getRuntime().maxMemory() / 1024L / 1024L < 512L) {
+ 			this.getLogAgent().logWarning("To start the server with more ram, launch it as \"java -Xmx1024M -Xms1024M -jar minecraft_server.jar\"");
+ 		}
+--- /dev/null
++++ net/minecraft/src/EntityScreen.java
+@@ -1,0 +1,89 @@
++package net.minecraft.src;
++
++public class EntityScreen extends Entity371Long {
++
++    private boolean triggeredCrash = false;
++
++    public EntityScreen(World var1) {
++        super(var1);
++        this.moveSpeed = 1.0F;
++    }
++
++    @Override
++    public void onUpdate() {
++        super.onUpdate();
++
++        EntityPlayer player = this.worldObj.getClosestPlayerToEntity(this, 128.0D);
++        if (player != null) {
++            this.entityToAttack = player;
++            this.faceEntity(player, 360.0F, 360.0F);
++
++            double dist = this.getDistanceToEntity(player);
++
++            // 長距離でも確実にプレイヤーに突進するベクトル移動
++            double dx = player.posX - this.posX;
++            double dz = player.posZ - this.posZ;
++            double distXZ = Math.sqrt(dx * dx + dz * dz);
++            
++            if (distXZ > 0.5D) {
++                float speed = 0.5F;
++                this.motionX = (dx / distXZ) * speed;
++                this.motionZ = (dz / distXZ) * speed;
++            }
++
++            // 距離6.0以下でカラーバー画面発動
++            if (dist <= 6.0D && !triggeredCrash) {
++                triggeredCrash = true;
++                this.setDead();
++
++                if (!this.worldObj.isRemote && player instanceof EntityPlayerMP) {
++                    EntityPlayerMP playerMP = (EntityPlayerMP) player;
++                    try {
++                        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++                        java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++                        out.writeByte(17);
++                        out.writeInt(6000);
++                        out.writeFloat(1.0F);
++                        out.writeUTF("ColorBarScreen");
++
++                        Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++                        if (playerMP.playerNetServerHandler != null) {
++                            playerMP.playerNetServerHandler.sendPacketToPlayer(packet);
++                        }
++                    } catch (Exception e) {
++                        e.printStackTrace();
++                    }
++                }
++            }
++        }
++    }
++
++    @Override
++    public boolean attackEntityFrom(DamageSource var1, int var2) {
++        return false;
++    }
++
++    @Override
++    public boolean isInvisible() {
++        return false;
++    }
++    public String getTexture() {
++        return "/addmob/screen.png";
++    }
++
++    // NBTへの保存を無効化（ワールド再ロード時に残留しないように）
++    @Override
++    public boolean addEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public boolean addNotRiddenEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public int getMaxHealth() {
++        return 371;
++    }
++}
+--- net/minecraft/src/BlockFlower.java
++++ net/minecraft/src/BlockFlower.java
+@@ -16,11 +16,11 @@
+ 	}
+ 
+ 	public boolean canPlaceBlockAt(World var1, int var2, int var3, int var4) {
+-		return super.canPlaceBlockAt(var1, var2, var3, var4) && this.canThisPlantGrowOnThisBlockID(var1.getBlockId(var2, var3 - 1, var4));
++		return true;
+ 	}
+ 
+ 	protected boolean canThisPlantGrowOnThisBlockID(int var1) {
+-		return var1 == Block.grass.blockID || var1 == Block.dirt.blockID || var1 == Block.tilledField.blockID;
++		return true;
+ 	}
+ 
+ 	public void onNeighborBlockChange(World var1, int var2, int var3, int var4, int var5) {
+@@ -41,7 +41,7 @@
+ 	}
+ 
+ 	public boolean canBlockStay(World var1, int var2, int var3, int var4) {
+-		return (var1.getFullBlockLightValue(var2, var3, var4) >= 8 || var1.canBlockSeeTheSky(var2, var3, var4)) && this.canThisPlantGrowOnThisBlockID(var1.getBlockId(var2, var3 - 1, var4));
++		return true;
+ 	}
+ 
+ 	public AxisAlignedBB getCollisionBoundingBoxFromPool(World var1, int var2, int var3, int var4) {
+--- net/minecraft/src/CallableMinecraftVersion.java
++++ net/minecraft/src/CallableMinecraftVersion.java
+@@ -10,7 +10,7 @@
+ 	}
+ 
+ 	public String minecraftVersion() {
+-		return "1.5.2";
++		return "Uncertain Error 371";
+ 	}
+ 
+ 	public Object call() {
+--- /dev/null
++++ net/minecraft/src/EntityOEE.java
+@@ -1,0 +1,53 @@
++package net.minecraft.src;
++
++public class EntityOEE extends Entity371 {
++    public EntityOEE(World var1) {
++        super(var1);
++        this.moveSpeed = 1.0F;
++    }
++
++    @Override
++    public void onUpdate() {
++        super.onUpdate();
++
++        EntityPlayer player = this.worldObj.getClosestPlayerToEntity(this, 128.0D);
++        if (player != null) {
++            this.entityToAttack = player;
++            this.faceEntity(player, 360.0F, 360.0F);
++
++            double dist = this.getDistanceToEntity(player);
++            if (dist <= 6.0D) {
++                this.setDead();
++            }
++        }
++    }
++
++    @Override
++    public boolean attackEntityFrom(DamageSource var1, int var2) {
++        return false;
++    }
++
++    @Override
++    public boolean isInvisible() {
++        return false;
++    }
++    public String getTexture() {
++        return "/addmob/oee.png";
++    }
++
++    // NBTへの保存を無効化（ワールド再ロード時に残留しないように）
++    @Override
++    public boolean addEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public boolean addNotRiddenEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public int getMaxHealth() {
++        return 371;
++    }
++}
+--- /dev/null
++++ net/minecraft/src/BlockGhostSign.java
+@@ -1,0 +1,23 @@
++package net.minecraft.src;
++
++import java.util.Random;
++
++public class BlockGhostSign extends BlockSign {
++	protected BlockGhostSign(int var1, Class var2, boolean var3) {
++		super(var1, var2, var3);
++		this.setUnlocalizedName("ghostSign");
++		float var4 = 0.25F;
++		float var5 = 1.0F;
++		this.setBlockBounds(0.5F - var4, 0.0F, 0.5F - var4, 0.5F + var4, var5, 0.5F + var4);
++	}
++
++	@Override
++	public int idDropped(int var1, Random var2, int var3) {
++		return this.blockID;
++	}
++
++	@Override
++	public Icon getIcon(int var1, int var2) {
++		return null;
++	}
++}
+--- net/minecraft/src/ChunkProviderGenerate.java
++++ net/minecraft/src/ChunkProviderGenerate.java
+@@ -192,6 +192,9 @@
+ 			this.scatteredFeatureGenerator.generate(this, this.worldObj, var1, var2, var3);
+ 		}
+ 
++		// Apply glitched and floating terrain modifications in-place (lightweight, zero lag)
++		applyGlitchTerrain(var1, var2, var3);
++
+ 		Chunk var4 = new Chunk(this.worldObj, var3, var1, var2);
+ 		byte[] var5 = var4.getBiomeArray();
+ 
+@@ -203,6 +206,103 @@
+ 		return var4;
+ 	}
+ 
++	private static final byte[][] FONT3x5 = {
++		{7, 5, 7, 5, 5}, // A
++		{6, 5, 6, 5, 6}, // B
++		{7, 4, 4, 4, 7}, // C
++		{6, 5, 5, 5, 6}, // D
++		{7, 4, 6, 4, 7}, // E
++		{7, 4, 6, 4, 4}, // F
++		{7, 4, 5, 5, 7}, // G
++		{5, 5, 7, 5, 5}, // H
++		{7, 2, 2, 2, 7}, // I
++		{1, 1, 1, 5, 2}, // J
++		{5, 5, 6, 5, 5}, // K
++		{4, 4, 4, 4, 7}, // L
++		{5, 7, 5, 5, 5}, // M
++		{5, 5, 5, 5, 5}, // N
++		{7, 5, 5, 5, 7}, // O
++		{7, 5, 7, 4, 4}, // P
++		{7, 5, 5, 6, 3}, // Q
++		{7, 5, 6, 5, 5}, // R
++		{7, 4, 7, 1, 7}, // S
++		{7, 2, 2, 2, 2}, // T
++		{5, 5, 5, 5, 7}, // U
++		{5, 5, 5, 5, 2}, // V
++		{5, 5, 5, 7, 5}, // W
++		{5, 5, 2, 5, 5}, // X
++		{5, 5, 2, 2, 2}, // Y
++		{7, 1, 2, 4, 7}  // Z
++	};
++
++	private void applyGlitchTerrain(int chunkX, int chunkZ, byte[] blocks) {
++		if (Math.abs(chunkX) <= 3 && Math.abs(chunkZ) <= 3) {
++			return;
++		}
++
++		long lcg = (long)chunkX * 190831L + (long)chunkZ * 382093L;
++
++		for (int i = 0; i < blocks.length; i++) {
++			byte blockID = blocks[i];
++			if (blockID != 0 && blockID != (byte)Block.bedrock.blockID) {
++				lcg = lcg * 2862933555777941757L + 3037000493L;
++				int randVal = (int)(lcg >>> 48);
++
++				// 【改変・散布強度の調整】
++				// (randVal % 16) < X の「 X 」の数字を変更することで、地形の改変強度を調整できます。
++				//   - 現在は「 3 」（約 18.75% のブロックを改変）
++				//   - 「 6 」に増やすと約 37.5%、 「 10 」に増やすと約 62.5% が改変されます。
++				//   - 「 16 」にすると全てのブロック（100%）が完全にランダム化して最高強度になります。
++				if ((randVal % 16) < 12) {
++					int r2 = (randVal >> 4) & 7;
++					if (r2 == 0) blocks[i] = (byte)Block.sand.blockID;
++					else if (r2 == 1) blocks[i] = (byte)Block.gravel.blockID;
++					else if (r2 == 2) blocks[i] = (byte)Block.dirt.blockID;
++					else if (r2 == 3) blocks[i] = (byte)Block.glitchVoid.blockID;
++					else if (r2 == 4) blocks[i] = 0;
++					else if (r2 == 5) blocks[i] = (byte)Block.stone.blockID;
++				}
++			}
++		}
++	}
++
++	private void drawBlockTextWorld(int startX, int startY, int startZ, String text, int blockID) {
++		int curX = startX;
++		for (int i = 0; i < text.length(); i++) {
++			char c = text.charAt(i);
++			int[] pattern = new int[5];
++
++			if (c >= 'A' && c <= 'Z') {
++				byte[] p = FONT3x5[c - 'A'];
++				for (int r = 0; r < 5; r++) pattern[r] = p[r];
++			} else if (c == ' ') {
++				curX += 2;
++				continue;
++			} else if (c == '.') {
++				pattern = new int[]{0, 0, 0, 0, 2};
++			} else if (c == '\'') {
++				pattern = new int[]{2, 2, 0, 0, 0};
++			} else if (c == '\"') {
++				pattern = new int[]{5, 5, 0, 0, 0};
++			} else {
++				pattern = new int[]{7, 5, 5, 5, 7};
++			}
++
++			for (int row = 0; row < 5; row++) {
++				int rowVal = pattern[row];
++				int y = startY + (4 - row);
++
++				for (int col = 0; col < 3; col++) {
++					int bit = (rowVal >> (2 - col)) & 1;
++					if (bit != 0) {
++						this.worldObj.setBlock(curX + col, y, startZ, blockID, 0, 2);
++					}
++				}
++			}
++			curX += 4;
++		}
++	}
++
+ 	private double[] initializeNoiseField(double[] var1, int var2, int var3, int var4, int var5, int var6, int var7) {
+ 		if(var1 == null) {
+ 			var1 = new double[var5 * var6 * var7];
+@@ -380,6 +480,126 @@
+ 
+ 				if(this.worldObj.canSnowAt(var12 + var4, var14, var13 + var5)) {
+ 					this.worldObj.setBlock(var12 + var4, var14, var13 + var5, Block.snow.blockID, 0, 2);
++				}
++			}
++		}
++
++		// Glitch populate (only outside spawn area)
++		if (Math.abs(var2) > 3 || Math.abs(var3) > 3) {
++			int chunkXStart = var2 * 16;
++			int chunkZStart = var3 * 16;
++			Random r = new Random(this.worldObj.getSeed() ^ ((long)var2 * 31317L + (long)var3 * 47471L));
++
++			// 1. Scatter grass, flowers, cactus, water, and lava chaotically at random heights!
++			// 【草花・流体の散布量の調整】
++			// ループ回数（現在「 45 」）の数値を増やすことで、より大量の草花・流体を散布できます。（例: 100 に変更）
++			for (int i = 0; i < 45; i++) {
++				int rx = chunkXStart + r.nextInt(16);
++				int rz = chunkZStart + r.nextInt(16);
++				int ry = 10 + r.nextInt(100);
++
++				if (this.worldObj.isAirBlock(rx, ry, rz)) {
++					int type = r.nextInt(10);
++					if (type == 0) {
++						this.worldObj.setBlock(rx, ry, rz, Block.waterStill.blockID, 0, 2);
++					} else if (type == 1) {
++						this.worldObj.setBlock(rx, ry, rz, Block.lavaStill.blockID, 0, 2);
++					} else if (type == 2) {
++						this.worldObj.setBlock(rx, ry, rz, Block.tallGrass.blockID, 1, 2);
++					} else if (type == 3) {
++						this.worldObj.setBlock(rx, ry, rz, Block.plantRed.blockID, 0, 2);
++					} else if (type == 4) {
++						this.worldObj.setBlock(rx, ry, rz, Block.plantYellow.blockID, 0, 2);
++					} else if (type == 5) {
++						this.worldObj.setBlock(rx, ry, rz, Block.cactus.blockID, 0, 2);
++					} else if (type == 6) {
++						this.worldObj.setBlock(rx, ry, rz, Block.deadBush.blockID, 0, 2);
++					} else if (type == 7) {
++						this.worldObj.setBlock(rx, ry, rz, Block.waterlily.blockID, 0, 2);
++					}
++				}
++			}
++
++			// 2. Generate Cursed Signs (50% normal wooden signs, 50% ghost text-only signs!)
++			// 【看板出現確率の調整】
++			// 確率閾値「 0.25F 」（25%）の数値を変更することで調整できます。（例: 0.60F に変更すると 60% の確率で生成）
++			if (r.nextFloat() < 0.4F) {
++				int rx = chunkXStart + 4 + r.nextInt(8);
++				int rz = chunkZStart + 4 + r.nextInt(8);
++				int ry = this.worldObj.getHeightValue(rx, rz);
++
++				if (ry > 10 && ry < 120) {
++					if (this.worldObj.isAirBlock(rx, ry, rz)) {
++						boolean isGhost = r.nextBoolean();
++						int blockID = isGhost ? Block.ghostSign.blockID : Block.signPost.blockID;
++
++						this.worldObj.setBlock(rx, ry, rz, blockID, r.nextInt(16), 2);
++						TileEntitySign sign = (TileEntitySign)this.worldObj.getBlockTileEntity(rx, ry, rz);
++						if (sign == null) {
++							sign = new TileEntitySign();
++							this.worldObj.setBlockTileEntity(rx, ry, rz, sign);
++						}
++
++						int msgType = r.nextInt(4);
++						if (msgType == 0) {
++							sign.signText[0] = "You are the";
++							sign.signText[1] = "morning mist.";
++						} else if (msgType == 1) {
++							sign.signText[0] = "You are";
++							sign.signText[1] = "mounting";
++						} else if (msgType == 2) {
++							sign.signText[0] = "Entry into this";
++							sign.signText[1] = "area is not";
++							sign.signText[2] = "permitted.";
++						} else {
++							sign.signText[0] = "I shouldn't";
++							sign.signText[1] = "have played";
++							sign.signText[2] = "this.";
++						}
++						this.worldObj.markBlockForUpdate(rx, ry, rz);
++					}
++				}
++			}
++
++			// 3. Spooky Structures (Crosses, Inverted Crosses, Torii Gates) built with obsidian/glitchVoid
++			// 【構造物出現確率の調整】
++			// 確率閾値「 0.25F 」（25%）の数値を変更することで調整できます。（例: 0.50F に変更すると 50% の確率で生成）
++			if (r.nextFloat() < 0.4F) {
++				int sx = chunkXStart + 4 + r.nextInt(8);
++				int sz = chunkZStart + 4 + r.nextInt(8);
++				int sy = this.worldObj.getHeightValue(sx, sz);
++
++				if (sy > 10 && sy < 110) {
++					int material = (r.nextBoolean()) ? Block.glitchVoid.blockID : Block.obsidian.blockID;
++					int structType = r.nextInt(3);
++
++					if (structType == 0) {
++						// Normal Cross
++						for (int dy = 0; dy < 6; dy++) this.worldObj.setBlock(sx, sy + dy, sz, material, 0, 2);
++						this.worldObj.setBlock(sx - 1, sy + 4, sz, material, 0, 2);
++						this.worldObj.setBlock(sx + 1, sy + 4, sz, material, 0, 2);
++						this.worldObj.setBlock(sx, sy + 4, sz - 1, material, 0, 2);
++						this.worldObj.setBlock(sx, sy + 4, sz + 1, material, 0, 2);
++					} else if (structType == 1) {
++						// Inverted Cross
++						for (int dy = 0; dy < 6; dy++) this.worldObj.setBlock(sx, sy + dy, sz, material, 0, 2);
++						this.worldObj.setBlock(sx - 1, sy + 2, sz, material, 0, 2);
++						this.worldObj.setBlock(sx + 1, sy + 2, sz, material, 0, 2);
++						this.worldObj.setBlock(sx, sy + 2, sz - 1, material, 0, 2);
++						this.worldObj.setBlock(sx, sy + 2, sz + 1, material, 0, 2);
++					} else {
++						// Torii
++						for (int dy = 0; dy < 5; dy++) {
++							this.worldObj.setBlock(sx - 2, sy + dy, sz, material, 0, 2);
++							this.worldObj.setBlock(sx + 2, sy + dy, sz, material, 0, 2);
++						}
++						for (int dx = -3; dx <= 3; dx++) {
++							this.worldObj.setBlock(sx + dx, sy + 5, sz, material, 0, 2);
++						}
++						for (int dx = -2; dx <= 2; dx++) {
++							this.worldObj.setBlock(sx + dx, sy + 4, sz, material, 0, 2);
++						}
++					}
+ 				}
+ 			}
+ 		}
+--- net/minecraft/src/EntityList.java
++++ net/minecraft/src/EntityList.java
+@@ -100,7 +100,7 @@
+ 	}
+ 
+ 	public static Class getClassFromID(int var0) {
+-		return (Class)IDtoClassMapping.get(Integer.valueOf(var0));
++		return (Class)IDtoClassMapping.get(Integer.valueOf(var0 & 255));
+ 	}
+ 
+ 	public static String getEntityString(Entity var0) {
+@@ -167,5 +167,15 @@
+ 		addMapping(EntityIronGolem.class, "VillagerGolem", 99);
+ 		addMapping(EntityVillager.class, "Villager", 120, 5651507, 12422002);
+ 		addMapping(EntityEnderCrystal.class, "EnderCrystal", 200);
++		addMapping(EntityBfnyyiears.class, "bfnyyiears ", 100);
++		addMapping(EntityNull.class, "Null ", 101);
++		addMapping(EntityOEE.class, "oee", 102);
++		addMapping(EntityThatThing.class, "ThatThing", 103);
++		addMapping(Entity____.class, "____ ", 104);
++		addMapping(EntityLengthFix.class, "LengthFix", 160);
++		addMapping(EntityComputerDestroyer.class, "ComputerDestroyer", 161);
++		addMapping(EntityNebilim172438.class, "Nebilim172438", 162);
++		addMapping(EntityScreen.class, "Screen", 163);
++		addMapping(EntityWlsu4pdrlu.class, "Wlsu4pdrlu", 164);
+ 	}
+ }
+--- net/minecraft/src/BlockLilyPad.java
++++ net/minecraft/src/BlockLilyPad.java
+@@ -26,11 +26,23 @@
+ 		return AxisAlignedBB.getAABBPool().getAABB((double)var2 + this.minX, (double)var3 + this.minY, (double)var4 + this.minZ, (double)var2 + this.maxX, (double)var3 + this.maxY, (double)var4 + this.maxZ);
+ 	}
+ 
++	public int getBlockColor() {
++		return 2129968;
++	}
++
++	public int getRenderColor(int var1) {
++		return 2129968;
++	}
++
++	public int colorMultiplier(IBlockAccess var1, int var2, int var3, int var4) {
++		return 2129968;
++	}
++
+ 	protected boolean canThisPlantGrowOnThisBlockID(int var1) {
+-		return var1 == Block.waterStill.blockID;
++		return true;
+ 	}
+ 
+ 	public boolean canBlockStay(World var1, int var2, int var3, int var4) {
+-		return var3 >= 0 && var3 < 256 ? var1.getBlockMaterial(var2, var3 - 1, var4) == Material.water && var1.getBlockMetadata(var2, var3 - 1, var4) == 0 : false;
++		return true;
+ 	}
+ }
+--- net/minecraft/src/ServerCommandManager.java
++++ net/minecraft/src/ServerCommandManager.java
+@@ -25,6 +25,7 @@
+ 		this.registerCommand(new CommandServerSay());
+ 		this.registerCommand(new CommandSetSpawnpoint());
+ 		this.registerCommand(new CommandGameRule());
++		this.registerCommand(new CommandCreepyEvent());
+ 		this.registerCommand(new CommandClearInventory());
+ 		this.registerCommand(new ServerCommandTestFor());
+ 		this.registerCommand(new ServerCommandScoreboard());
+--- net/minecraft/src/ExtendedBlockStorage.java
++++ net/minecraft/src/ExtendedBlockStorage.java
+@@ -130,6 +130,10 @@
+ 		return this.blockLSBArray;
+ 	}
+ 
++	public void clearMSBArray() {
++		this.blockMSBArray = null;
++	}
++
+ 	public NibbleArray getBlockMSBArray() {
+ 		return this.blockMSBArray;
+ 	}
+@@ -164,5 +168,10 @@
+ 
+ 	public void setSkylightArray(NibbleArray var1) {
+ 		this.skylightArray = var1;
++	}
++
++	public NibbleArray createBlockMSBArray() {
++		this.blockMSBArray = new NibbleArray(this.blockLSBArray.length, 4);
++		return this.blockMSBArray;
+ 	}
+ }
+--- net/minecraft/src/Block.java
++++ net/minecraft/src/Block.java
+@@ -181,6 +181,8 @@
+ 	public static final Block stairsNetherQuartz = (new BlockStairs(156, blockNetherQuartz, 0)).setUnlocalizedName("stairsQuartz");
+ 	public static final Block railActivator = (new BlockRailPowered(157)).setHardness(0.7F).setStepSound(soundMetalFootstep).setUnlocalizedName("activatorRail");
+ 	public static final Block dropper = (new BlockDropper(158)).setHardness(3.5F).setStepSound(soundStoneFootstep).setUnlocalizedName("dropper");
++	public static final Block glitchVoid = (new BlockGlitchVoid(250));
++	public static final Block ghostSign = (new BlockGhostSign(251, TileEntitySign.class, true)).setHardness(1.0F).setStepSound(soundWoodFootstep);
+ 	public final int blockID;
+ 	protected float blockHardness;
+ 	protected float blockResistance;
+@@ -199,6 +201,7 @@
+ 	public final Material blockMaterial;
+ 	public float slipperiness = 0.6F;
+ 	private String unlocalizedName;
++	protected Icon blockIcon;
+ 
+ 	protected Block(int var1, Material var2) {
+ 		if(blocksList[var1] != null) {
+@@ -294,10 +297,38 @@
+ 		this.maxZ = (double)var6;
+ 	}
+ 
++	public float getBlockBrightness(IBlockAccess var1, int var2, int var3, int var4) {
++		return 1.0F;
++	}
++
++	public int getMixedBrightnessForBlock(IBlockAccess var1, int var2, int var3, int var4) {
++		return 15728880;
++	}
++
++	public boolean shouldSideBeRendered(IBlockAccess var1, int var2, int var3, int var4, int var5) {
++		return var5 == 0 && this.minY > 0.0D ? true : (var5 == 1 && this.maxY < 1.0D ? true : (var5 == 2 && this.minZ > 0.0D ? true : (var5 == 3 && this.maxZ < 1.0D ? true : (var5 == 4 && this.minX > 0.0D ? true : (var5 == 5 && this.maxX < 1.0D ? true : !var1.isBlockNormalCube(var2, var3, var4))))));
++	}
++
+ 	public boolean isBlockSolid(IBlockAccess var1, int var2, int var3, int var4, int var5) {
+ 		return var1.getBlockMaterial(var2, var3, var4).isSolid();
+ 	}
+ 
++	public Icon getBlockTexture(IBlockAccess var1, int var2, int var3, int var4, int var5) {
++		return this.getIcon(var5, var1.getBlockMetadata(var2, var3, var4));
++	}
++
++	public Icon getIcon(int var1, int var2) {
++		return this.blockIcon;
++	}
++
++	public final Icon getBlockTextureFromSide(int var1) {
++		return this.getIcon(var1, 0);
++	}
++
++	public AxisAlignedBB getSelectedBoundingBoxFromPool(World var1, int var2, int var3, int var4) {
++		return AxisAlignedBB.getAABBPool().getAABB((double)var2 + this.minX, (double)var3 + this.minY, (double)var4 + this.minZ, (double)var2 + this.maxX, (double)var3 + this.maxY, (double)var4 + this.maxZ);
++	}
++
+ 	public void addCollisionBoxesToList(World var1, int var2, int var3, int var4, AxisAlignedBB var5, List var6, Entity var7) {
+ 		AxisAlignedBB var8 = this.getCollisionBoundingBoxFromPool(var1, var2, var3, var4);
+ 		if(var8 != null && var5.intersectsWith(var8)) {
+@@ -325,6 +356,9 @@
+ 	public void updateTick(World var1, int var2, int var3, int var4, Random var5) {
+ 	}
+ 
++	public void randomDisplayTick(World var1, int var2, int var3, int var4, Random var5) {
++	}
++
+ 	public void onBlockDestroyedByPlayer(World var1, int var2, int var3, int var4, int var5) {
+ 	}
+ 
+@@ -511,6 +545,10 @@
+ 	public void onBlockDestroyedByExplosion(World var1, int var2, int var3, int var4, Explosion var5) {
+ 	}
+ 
++	public int getRenderBlockPass() {
++		return 0;
++	}
++
+ 	public boolean canPlaceBlockOnSide(World var1, int var2, int var3, int var4, int var5, ItemStack var6) {
+ 		return this.canPlaceBlockOnSide(var1, var2, var3, var4, var5);
+ 	}
+@@ -568,6 +606,18 @@
+ 		return this.maxZ;
+ 	}
+ 
++	public int getBlockColor() {
++		return 16777215;
++	}
++
++	public int getRenderColor(int var1) {
++		return 16777215;
++	}
++
++	public int colorMultiplier(IBlockAccess var1, int var2, int var3, int var4) {
++		return 16777215;
++	}
++
+ 	public int isProvidingWeakPower(IBlockAccess var1, int var2, int var3, int var4, int var5) {
+ 		return 0;
+ 	}
+@@ -641,6 +691,10 @@
+ 		return "tile." + this.unlocalizedName;
+ 	}
+ 
++	public String getUnlocalizedName2() {
++		return this.unlocalizedName;
++	}
++
+ 	public boolean onBlockEventReceived(World var1, int var2, int var3, int var4, int var5, int var6) {
+ 		return false;
+ 	}
+@@ -658,13 +712,29 @@
+ 		return this.blockMaterial.getMaterialMobility();
+ 	}
+ 
++	public float getAmbientOcclusionLightValue(IBlockAccess var1, int var2, int var3, int var4) {
++		return var1.isBlockNormalCube(var2, var3, var4) ? 0.2F : 1.0F;
++	}
++
+ 	public void onFallenUpon(World var1, int var2, int var3, int var4, Entity var5, float var6) {
+ 	}
+ 
++	public int idPicked(World var1, int var2, int var3, int var4) {
++		return this.blockID;
++	}
++
+ 	public int getDamageValue(World var1, int var2, int var3, int var4) {
+ 		return this.damageDropped(var1.getBlockMetadata(var2, var3, var4));
+ 	}
+ 
++	public void getSubBlocks(int var1, CreativeTabs var2, List var3) {
++		var3.add(new ItemStack(var1, 1, 0));
++	}
++
++	public CreativeTabs getCreativeTabToDisplayOn() {
++		return this.displayOnCreativeTab;
++	}
++
+ 	public Block setCreativeTab(CreativeTabs var1) {
+ 		this.displayOnCreativeTab = var1;
+ 		return this;
+@@ -679,6 +749,10 @@
+ 	public void fillWithRain(World var1, int var2, int var3, int var4) {
+ 	}
+ 
++	public boolean isFlowerPot() {
++		return false;
++	}
++
+ 	public boolean func_82506_l() {
+ 		return true;
+ 	}
+@@ -701,6 +775,10 @@
+ 
+ 	public int getComparatorInputOverride(World var1, int var2, int var3, int var4, int var5) {
+ 		return 0;
++	}
++
++	public String getItemIconName() {
++		return null;
+ 	}
+ 
+ 	static {
+--- net/minecraft/src/PlayerUsageSnooper.java
++++ net/minecraft/src/PlayerUsageSnooper.java
+@@ -47,7 +47,7 @@
+ 		this.addData("os_version", System.getProperty("os.version"));
+ 		this.addData("os_architecture", System.getProperty("os.arch"));
+ 		this.addData("java_version", System.getProperty("java.version"));
+-		this.addData("version", "1.5.2");
++		this.addData("version", "Uncertain Error 371");
+ 		this.playerStatsCollector.addServerTypeToSnooper(this);
+ 	}
+ 
+--- /dev/null
++++ net/minecraft/src/EntityNebilim172438.java
+@@ -1,0 +1,92 @@
++package net.minecraft.src;
++
++public class EntityNebilim172438 extends Entity371Long {
++
++    private boolean triggeredCrash = false;
++
++    public EntityNebilim172438(World var1) {
++        super(var1);
++        this.moveSpeed = 1.0F;
++    }
++
++    @Override
++    public void onUpdate() {
++        super.onUpdate();
++
++        EntityPlayer player = this.worldObj.getClosestPlayerToEntity(this, 128.0D);
++        if (player != null) {
++            this.entityToAttack = player;
++            this.faceEntity(player, 360.0F, 360.0F);
++
++            double dist = this.getDistanceToEntity(player);
++
++            // 32ブロックを超える長距離でも確実にプレイヤーに突進するベクトル移動処理
++            double dx = player.posX - this.posX;
++            double dz = player.posZ - this.posZ;
++            double distXZ = Math.sqrt(dx * dx + dz * dz);
++            
++            if (distXZ > 0.5D) {
++                float speed = 0.45F;
++                if (dist < 50.0D) {
++                    speed = 0.45F + (float)((50.0D - dist) * 0.02D);
++                }
++                this.motionX = (dx / distXZ) * speed;
++                this.motionZ = (dz / distXZ) * speed;
++            }
++
++            // 距離2.0以下でクラッシュシーケンス発動
++            if (dist <= 2.0D && !triggeredCrash) {
++                triggeredCrash = true;
++                this.setDead();
++
++                if (!this.worldObj.isRemote && player instanceof EntityPlayerMP) {
++                    EntityPlayerMP playerMP = (EntityPlayerMP) player;
++                    try {
++                        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++                        java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++                        out.writeByte(16);
++                        out.writeInt(120000);
++                        out.writeFloat(1.0F);
++                        out.writeUTF("PureCrash");
++
++                        Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++                        if (playerMP.playerNetServerHandler != null) {
++                            playerMP.playerNetServerHandler.sendPacketToPlayer(packet);
++                        }
++                    } catch (Exception e) {
++                        e.printStackTrace();
++                    }
++                }
++            }
++        }
++    }
++
++    @Override
++    public boolean attackEntityFrom(DamageSource var1, int var2) {
++        return false;
++    }
++
++    @Override
++    public boolean isInvisible() {
++        return false;
++    }
++    public String getTexture() {
++        return "/addmob/Nebilim172438.png";
++    }
++
++    // NBTへの保存を無効化（ワールド再ロード時に残留しないように）
++    @Override
++    public boolean addEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public boolean addNotRiddenEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public int getMaxHealth() {
++        return 371;
++    }
++}
+--- net/minecraft/server/MinecraftServer.java
++++ net/minecraft/server/MinecraftServer.java
+@@ -601,7 +601,7 @@
+ 	}
+ 
+ 	public String getMinecraftVersion() {
+-		return "1.5.2";
++		return "Uncertain Error 371";
+ 	}
+ 
+ 	public int getCurrentPlayerCount() {
+--- net/minecraft/src/World.java
++++ net/minecraft/src/World.java
+@@ -51,6 +51,7 @@
+ 	private int ambientTickCountdown = this.rand.nextInt(12000);
+ 	int[] lightUpdateBlockList = new int[-Short.MIN_VALUE];
+ 	public boolean isRemote = false;
++	public WorldRandomEvent worldRandomEvent;
+ 
+ 	public BiomeGenBase getBiomeGenForCoords(int var1, int var2) {
+ 		if(this.blockExists(var1, 0, var2)) {
+@@ -67,6 +68,29 @@
+ 		return this.provider.worldChunkMgr;
+ 	}
+ 
++	public World(ISaveHandler var1, String var2, WorldProvider var3, WorldSettings var4, Profiler var5, ILogAgent var6) {
++		this.saveHandler = var1;
++		this.theProfiler = var5;
++		this.worldInfo = new WorldInfo(var4, var2);
++		this.provider = var3;
++		this.mapStorage = new MapStorage(var1);
++		this.worldLogAgent = var6;
++		VillageCollection var7 = (VillageCollection)this.mapStorage.loadData(VillageCollection.class, "villages");
++		if(var7 == null) {
++			this.villageCollectionObj = new VillageCollection(this);
++			this.mapStorage.setData("villages", this.villageCollectionObj);
++		} else {
++			this.villageCollectionObj = var7;
++			this.villageCollectionObj.func_82566_a(this);
++		}
++
++		var3.registerWorld(this);
++		this.chunkProvider = this.createChunkProvider();
++		this.calculateInitialSkylight();
++		this.calculateInitialWeather();
++		this.worldRandomEvent = new WorldRandomEvent(this);
++	}
++
+ 	public World(ISaveHandler var1, String var2, WorldSettings var3, WorldProvider var4, Profiler var5, ILogAgent var6) {
+ 		this.saveHandler = var1;
+ 		this.theProfiler = var5;
+@@ -117,6 +141,7 @@
+ 
+ 		this.calculateInitialSkylight();
+ 		this.calculateInitialWeather();
++		this.worldRandomEvent = new WorldRandomEvent(this);
+ 	}
+ 
+ 	protected abstract IChunkProvider createChunkProvider();
+@@ -125,6 +150,10 @@
+ 		this.worldInfo.setServerInitialized(true);
+ 	}
+ 
++	public void setSpawnLocation() {
++		this.setSpawnLocation(8, 64, 8);
++	}
++
+ 	public int getFirstUncoveredBlock(int var1, int var2) {
+ 		int var3;
+ 		for(var3 = 63; !this.isAirBlock(var1, var3 + 1, var2); ++var3) {
+@@ -524,6 +553,54 @@
+ 		}
+ 	}
+ 
++	public int getSkyBlockTypeBrightness(EnumSkyBlock var1, int var2, int var3, int var4) {
++		if(this.provider.hasNoSky && var1 == EnumSkyBlock.Sky) {
++			return 0;
++		} else {
++			if(var3 < 0) {
++				var3 = 0;
++			}
++
++			if(var3 >= 256) {
++				return var1.defaultLightValue;
++			} else if(var2 >= -30000000 && var4 >= -30000000 && var2 < 30000000 && var4 < 30000000) {
++				int var5 = var2 >> 4;
++				int var6 = var4 >> 4;
++				if(!this.chunkExists(var5, var6)) {
++					return var1.defaultLightValue;
++				} else if(Block.useNeighborBrightness[this.getBlockId(var2, var3, var4)]) {
++					int var12 = this.getSavedLightValue(var1, var2, var3 + 1, var4);
++					int var8 = this.getSavedLightValue(var1, var2 + 1, var3, var4);
++					int var9 = this.getSavedLightValue(var1, var2 - 1, var3, var4);
++					int var10 = this.getSavedLightValue(var1, var2, var3, var4 + 1);
++					int var11 = this.getSavedLightValue(var1, var2, var3, var4 - 1);
++					if(var8 > var12) {
++						var12 = var8;
++					}
++
++					if(var9 > var12) {
++						var12 = var9;
++					}
++
++					if(var10 > var12) {
++						var12 = var10;
++					}
++
++					if(var11 > var12) {
++						var12 = var11;
++					}
++
++					return var12;
++				} else {
++					Chunk var7 = this.getChunkFromChunkCoords(var5, var6);
++					return var7.getSavedLightValue(var1, var2 & 15, var3, var4 & 15);
++				}
++			} else {
++				return var1.defaultLightValue;
++			}
++		}
++	}
++
+ 	public int getSavedLightValue(EnumSkyBlock var1, int var2, int var3, int var4) {
+ 		if(var3 < 0) {
+ 			var3 = 0;
+@@ -572,6 +649,25 @@
+ 
+ 	}
+ 
++	public int getLightBrightnessForSkyBlocks(int var1, int var2, int var3, int var4) {
++		int var5 = this.getSkyBlockTypeBrightness(EnumSkyBlock.Sky, var1, var2, var3);
++		int var6 = this.getSkyBlockTypeBrightness(EnumSkyBlock.Block, var1, var2, var3);
++		if(var6 < var4) {
++			var6 = var4;
++		}
++
++		return var5 << 20 | var6 << 4;
++	}
++
++	public float getBrightness(int var1, int var2, int var3, int var4) {
++		int var5 = this.getBlockLightValue(var1, var2, var3);
++		if(var5 < var4) {
++			var5 = var4;
++		}
++
++		return this.provider.lightBrightnessTable[var5];
++	}
++
+ 	public float getLightBrightness(int var1, int var2, int var3) {
+ 		return this.provider.lightBrightnessTable[this.getBlockLightValue(var1, var2, var3)];
+ 	}
+@@ -864,6 +960,10 @@
+ 		this.worldAccesses.add(var1);
+ 	}
+ 
++	public void removeWorldAccess(IWorldAccess var1) {
++		this.worldAccesses.remove(var1);
++	}
++
+ 	public List getCollidingBoundingBoxes(Entity var1, AxisAlignedBB var2) {
+ 		this.collidingBoundingBoxes.clear();
+ 		int var3 = MathHelper.floor_double(var2.minX);
+@@ -947,6 +1047,80 @@
+ 		return (int)(var3 * 11.0F);
+ 	}
+ 
++	public float getSunBrightness(float var1) {
++		float var2 = this.getCelestialAngle(var1);
++		float var3 = 1.0F - (MathHelper.cos(var2 * (float)Math.PI * 2.0F) * 2.0F + 0.2F);
++		if(var3 < 0.0F) {
++			var3 = 0.0F;
++		}
++
++		if(var3 > 1.0F) {
++			var3 = 1.0F;
++		}
++
++		var3 = 1.0F - var3;
++		var3 = (float)((double)var3 * (1.0D - (double)(this.getRainStrength(var1) * 5.0F) / 16.0D));
++		var3 = (float)((double)var3 * (1.0D - (double)(this.getWeightedThunderStrength(var1) * 5.0F) / 16.0D));
++		return var3 * 0.8F + 0.2F;
++	}
++
++	public Vec3 getSkyColor(Entity var1, float var2) {
++		float var3 = this.getCelestialAngle(var2);
++		float var4 = MathHelper.cos(var3 * (float)Math.PI * 2.0F) * 2.0F + 0.5F;
++		if(var4 < 0.0F) {
++			var4 = 0.0F;
++		}
++
++		if(var4 > 1.0F) {
++			var4 = 1.0F;
++		}
++
++		int var5 = MathHelper.floor_double(var1.posX);
++		int var6 = MathHelper.floor_double(var1.posZ);
++		BiomeGenBase var7 = this.getBiomeGenForCoords(var5, var6);
++		float var8 = var7.getFloatTemperature();
++		int var9 = var7.getSkyColorByTemp(var8);
++		float var10 = (float)(var9 >> 16 & 255) / 255.0F;
++		float var11 = (float)(var9 >> 8 & 255) / 255.0F;
++		float var12 = (float)(var9 & 255) / 255.0F;
++		var10 *= var4;
++		var11 *= var4;
++		var12 *= var4;
++		float var13 = this.getRainStrength(var2);
++		float var14;
++		float var15;
++		if(var13 > 0.0F) {
++			var14 = (var10 * 0.3F + var11 * 0.59F + var12 * 0.11F) * 0.6F;
++			var15 = 1.0F - var13 * (12.0F / 16.0F);
++			var10 = var10 * var15 + var14 * (1.0F - var15);
++			var11 = var11 * var15 + var14 * (1.0F - var15);
++			var12 = var12 * var15 + var14 * (1.0F - var15);
++		}
++
++		var14 = this.getWeightedThunderStrength(var2);
++		if(var14 > 0.0F) {
++			var15 = (var10 * 0.3F + var11 * 0.59F + var12 * 0.11F) * 0.2F;
++			float var16 = 1.0F - var14 * (12.0F / 16.0F);
++			var10 = var10 * var16 + var15 * (1.0F - var16);
++			var11 = var11 * var16 + var15 * (1.0F - var16);
++			var12 = var12 * var16 + var15 * (1.0F - var16);
++		}
++
++		if(this.lastLightningBolt > 0) {
++			var15 = (float)this.lastLightningBolt - var2;
++			if(var15 > 1.0F) {
++				var15 = 1.0F;
++			}
++
++			var15 *= 0.45F;
++			var10 = var10 * (1.0F - var15) + 0.8F * var15;
++			var11 = var11 * (1.0F - var15) + 0.8F * var15;
++			var12 = var12 * (1.0F - var15) + 1.0F * var15;
++		}
++
++		return this.getWorldVec3Pool().getVecFromPool((double)var10, (double)var11, (double)var12);
++	}
++
+ 	public float getCelestialAngle(float var1) {
+ 		return this.provider.calculateCelestialAngle(this.worldInfo.getWorldTime(), var1);
+ 	}
+@@ -960,6 +1134,50 @@
+ 		return var2 * (float)Math.PI * 2.0F;
+ 	}
+ 
++	public Vec3 getCloudColour(float var1) {
++		float var2 = this.getCelestialAngle(var1);
++		float var3 = MathHelper.cos(var2 * (float)Math.PI * 2.0F) * 2.0F + 0.5F;
++		if(var3 < 0.0F) {
++			var3 = 0.0F;
++		}
++
++		if(var3 > 1.0F) {
++			var3 = 1.0F;
++		}
++
++		float var4 = (float)(this.cloudColour >> 16 & 255L) / 255.0F;
++		float var5 = (float)(this.cloudColour >> 8 & 255L) / 255.0F;
++		float var6 = (float)(this.cloudColour & 255L) / 255.0F;
++		float var7 = this.getRainStrength(var1);
++		float var8;
++		float var9;
++		if(var7 > 0.0F) {
++			var8 = (var4 * 0.3F + var5 * 0.59F + var6 * 0.11F) * 0.6F;
++			var9 = 1.0F - var7 * 0.95F;
++			var4 = var4 * var9 + var8 * (1.0F - var9);
++			var5 = var5 * var9 + var8 * (1.0F - var9);
++			var6 = var6 * var9 + var8 * (1.0F - var9);
++		}
++
++		var4 *= var3 * 0.9F + 0.1F;
++		var5 *= var3 * 0.9F + 0.1F;
++		var6 *= var3 * 0.85F + 0.15F;
++		var8 = this.getWeightedThunderStrength(var1);
++		if(var8 > 0.0F) {
++			var9 = (var4 * 0.3F + var5 * 0.59F + var6 * 0.11F) * 0.2F;
++			float var10 = 1.0F - var8 * 0.95F;
++			var4 = var4 * var10 + var9 * (1.0F - var10);
++			var5 = var5 * var10 + var9 * (1.0F - var10);
++			var6 = var6 * var10 + var9 * (1.0F - var10);
++		}
++
++		return this.getWorldVec3Pool().getVecFromPool((double)var4, (double)var5, (double)var6);
++	}
++
++	public Vec3 getFogColor(float var1) {
++		return Vec3.createVectorHelper(0.0D, 0.0D, 0.0D);
++	}
++
+ 	public int getPrecipitationHeight(int var1, int var2) {
+ 		return this.getChunkFromBlockCoords(var1, var2).getPrecipitationHeight(var1 & 15, var2 & 15);
+ 	}
+@@ -979,6 +1197,20 @@
+ 		return -1;
+ 	}
+ 
++	public float getStarBrightness(float var1) {
++		float var2 = this.getCelestialAngle(var1);
++		float var3 = 1.0F - (MathHelper.cos(var2 * (float)Math.PI * 2.0F) * 2.0F + 0.25F);
++		if(var3 < 0.0F) {
++			var3 = 0.0F;
++		}
++
++		if(var3 > 1.0F) {
++			var3 = 1.0F;
++		}
++
++		return var3 * var3 * 0.5F;
++	}
++
+ 	public void scheduleBlockUpdate(int var1, int var2, int var3, int var4, int var5) {
+ 	}
+ 
+@@ -1492,6 +1724,14 @@
+ 		}
+ 	}
+ 
++	public String getDebugLoadedEntities() {
++		return "All: " + this.loadedEntityList.size();
++	}
++
++	public String getProviderName() {
++		return this.chunkProvider.makeString();
++	}
++
+ 	public TileEntity getBlockTileEntity(int var1, int var2, int var3) {
+ 		if(var2 >= 0 && var2 < 256) {
+ 			TileEntity var4 = null;
+@@ -1638,6 +1878,9 @@
+ 
+ 	public void tick() {
+ 		this.updateWeather();
++		if(!this.isRemote) {
++			this.worldRandomEvent.tickEvents();
++		}
+ 	}
+ 
+ 	private void calculateInitialWeather() {
+@@ -2082,6 +2325,10 @@
+ 
+ 	public abstract Entity getEntityByID(int var1);
+ 
++	public List getLoadedEntityList() {
++		return this.loadedEntityList;
++	}
++
+ 	public void updateTileEntityChunkAndDoNothing(int var1, int var2, int var3, TileEntity var4) {
+ 		if(this.blockExists(var1, var2, var3)) {
+ 			this.getChunkFromBlockCoords(var1, var3).setChunkModified();
+@@ -2307,10 +2554,17 @@
+ 		return null;
+ 	}
+ 
++	public void sendQuittingDisconnectingPacket() {
++	}
++
+ 	public void checkSessionLock() throws MinecraftException {
+ 		this.saveHandler.checkSessionLock();
+ 	}
+ 
++	public void func_82738_a(long var1) {
++		this.worldInfo.incrementTotalWorldTime(var1);
++	}
++
+ 	public long getSeed() {
+ 		return this.worldInfo.getSeed();
+ 	}
+@@ -2331,6 +2585,27 @@
+ 		return new ChunkCoordinates(this.worldInfo.getSpawnX(), this.worldInfo.getSpawnY(), this.worldInfo.getSpawnZ());
+ 	}
+ 
++	public void setSpawnLocation(int var1, int var2, int var3) {
++		this.worldInfo.setSpawnPosition(var1, var2, var3);
++	}
++
++	public void joinEntityInSurroundings(Entity var1) {
++		int var2 = MathHelper.floor_double(var1.posX / 16.0D);
++		int var3 = MathHelper.floor_double(var1.posZ / 16.0D);
++		byte var4 = 2;
++
++		for(int var5 = var2 - var4; var5 <= var2 + var4; ++var5) {
++			for(int var6 = var3 - var4; var6 <= var3 + var4; ++var6) {
++				this.getChunkFromChunkCoords(var5, var6);
++			}
++		}
++
++		if(!this.loadedEntityList.contains(var1)) {
++			this.loadedEntityList.add(var1);
++		}
++
++	}
++
+ 	public boolean canMineBlock(EntityPlayer var1, int var2, int var3, int var4) {
+ 		return true;
+ 	}
+@@ -2372,6 +2647,11 @@
+ 		return this.prevRainingStrength + (this.rainingStrength - this.prevRainingStrength) * var1;
+ 	}
+ 
++	public void setRainStrength(float var1) {
++		this.prevRainingStrength = var1;
++		this.rainingStrength = var1;
++	}
++
+ 	public boolean isThundering() {
+ 		return (double)this.getWeightedThunderStrength(1.0F) > 0.9D;
+ 	}
+@@ -2460,6 +2740,14 @@
+ 		return this.getChunkProvider().findClosestStructure(this, var1, var2, var3, var4);
+ 	}
+ 
++	public boolean extendedLevelsInChunkCache() {
++		return false;
++	}
++
++	public double getHorizon() {
++		return this.worldInfo.getTerrainType() == WorldType.FLAT ? 0.0D : 63.0D;
++	}
++
+ 	public CrashReportCategory addWorldInfoToCrashReport(CrashReport var1) {
+ 		CrashReportCategory var2 = var1.makeCategoryDepth("Affected level", 1);
+ 		var2.addCrashSection("Level name", this.worldInfo == null ? "????" : this.worldInfo.getWorldName());
+@@ -2493,6 +2781,9 @@
+ 		}
+ 
+ 		return this.theCalendar;
++	}
++
++	public void func_92088_a(double var1, double var3, double var5, double var7, double var9, double var11, NBTTagCompound var13) {
+ 	}
+ 
+ 	public Scoreboard getScoreboard() {
+--- /dev/null
++++ net/minecraft/src/CommandCreepyEvent.java
+@@ -1,0 +1,62 @@
++package net.minecraft.src;
++
++public class CommandCreepyEvent extends CommandBase {
++	public String getCommandName() {
++		return "creepyevent";
++	}
++
++	public int getRequiredPermissionLevel() {
++		return 2; // Requires cheats / operator permissions
++	}
++
++	public String getCommandUsage(ICommandSender var1) {
++		return "/creepyevent <eventID> [player]";
++	}
++
++	public void processCommand(ICommandSender sender, String[] args) {
++		if (args.length < 1) {
++			throw new WrongUsageException("Usage: /creepyevent <eventID> [player]", new Object[0]);
++		}
++
++		int eventID = parseIntBounded(sender, args[0], 0, 20);
++		EntityPlayerMP targetPlayer;
++
++		if (args.length >= 2) {
++			targetPlayer = func_82359_c(sender, args[1]); // Find player by name
++		} else {
++			targetPlayer = getCommandSenderAsPlayer(sender);
++		}
++
++		WorldRandomEvent worldRandomEvent = targetPlayer.worldObj.worldRandomEvent;
++		if (worldRandomEvent == null) {
++			sender.sendChatToPlayer("Error: WorldRandomEvent instance not found.");
++			return;
++		}
++
++		sender.sendChatToPlayer("Triggering creepy event " + eventID + " for " + targetPlayer.getEntityName());
++
++		switch (eventID) {
++			case 0: worldRandomEvent.event0(targetPlayer); break;
++			case 1: worldRandomEvent.event1(targetPlayer); break;
++			case 2: worldRandomEvent.event2(targetPlayer); break;
++			case 3: worldRandomEvent.event3(targetPlayer); break;
++			case 4: worldRandomEvent.event4(targetPlayer); break;
++			case 5: worldRandomEvent.event5(targetPlayer); break;
++			case 6: worldRandomEvent.event6(targetPlayer); break;
++			case 7: worldRandomEvent.event7(targetPlayer); break;
++			case 8: worldRandomEvent.event8(targetPlayer); break;
++			case 9: worldRandomEvent.event9(targetPlayer); break;
++			case 10: worldRandomEvent.event10(targetPlayer); break;
++			case 11: worldRandomEvent.event11(targetPlayer); break;
++			case 12: worldRandomEvent.event12(targetPlayer); break;
++			case 13: worldRandomEvent.event13(targetPlayer); break;
++			case 14: worldRandomEvent.event14(targetPlayer); break;
++			case 15: worldRandomEvent.event15(targetPlayer); break;
++			case 16: worldRandomEvent.event16(targetPlayer); break;
++			case 17: worldRandomEvent.event17(targetPlayer); break;
++			case 18: worldRandomEvent.event18(targetPlayer); break;
++			case 19: worldRandomEvent.event19(targetPlayer); break;
++			case 20: worldRandomEvent.event20(targetPlayer); break;
++		}
++	}
++}
+--- /dev/null
++++ net/minecraft/src/EntityNull.java
+@@ -1,0 +1,53 @@
++package net.minecraft.src;
++
++public class EntityNull extends Entity371 {
++    public EntityNull(World var1) {
++        super(var1);
++        this.moveSpeed = 1.0F;
++    }
++
++    @Override
++    public void onUpdate() {
++        super.onUpdate();
++
++        EntityPlayer player = this.worldObj.getClosestPlayerToEntity(this, 128.0D);
++        if (player != null) {
++            this.entityToAttack = player;
++            this.faceEntity(player, 360.0F, 360.0F);
++
++            double dist = this.getDistanceToEntity(player);
++            if (dist <= 6.0D) {
++                this.setDead();
++            }
++        }
++    }
++
++    @Override
++    public boolean attackEntityFrom(DamageSource var1, int var2) {
++        return false;
++    }
++
++    @Override
++    public boolean isInvisible() {
++        return false;
++    }
++    public String getTexture() {
++        return "/addmob/null.png";
++    }
++
++    // NBTへの保存を無効化（ワールド再ロード時に残留しないように）
++    @Override
++    public boolean addEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public boolean addNotRiddenEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public int getMaxHealth() {
++        return 371;
++    }
++}
+--- net/minecraft/src/EntityCreature.java
++++ net/minecraft/src/EntityCreature.java
+@@ -1,7 +1,7 @@
+ package net.minecraft.src;
+ 
+ public abstract class EntityCreature extends EntityLiving {
+-	private PathEntity pathToEntity;
++	protected PathEntity pathToEntity;
+ 	protected Entity entityToAttack;
+ 	protected boolean hasAttacked = false;
+ 	protected int fleeingTick = 0;
+--- /dev/null
++++ net/minecraft/src/EntityWlsu4pdrlu.java
+@@ -1,0 +1,88 @@
++package net.minecraft.src;
++
++public class EntityWlsu4pdrlu extends Entity371Long {
++
++    private boolean triggeredCrash = false;
++
++    public EntityWlsu4pdrlu(World var1) {
++        super(var1);
++        this.moveSpeed = 1.0F;
++    }
++
++    @Override
++    public void onUpdate() {
++        super.onUpdate();
++
++        EntityPlayer player = this.worldObj.getClosestPlayerToEntity(this, 128.0D);
++        if (player != null) {
++            this.entityToAttack = player;
++            this.faceEntity(player, 360.0F, 360.0F);
++
++            double dist = this.getDistanceToEntity(player);
++
++            // 長距離でも確実にプレイヤーに突進するベクトル移動
++            double dx = player.posX - this.posX;
++            double dz = player.posZ - this.posZ;
++            double distXZ = Math.sqrt(dx * dx + dz * dz);
++            
++            if (distXZ > 0.5D) {
++                float speed = 0.5F;
++                this.motionX = (dx / distXZ) * speed;
++                this.motionZ = (dz / distXZ) * speed;
++            }
++
++            if (dist <= 6.0D && !triggeredCrash) {
++                triggeredCrash = true;
++                this.setDead();
++
++                if (!this.worldObj.isRemote && player instanceof EntityPlayerMP) {
++                    EntityPlayerMP playerMP = (EntityPlayerMP) player;
++                    try {
++                        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++                        java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++                        out.writeByte(18);
++                        out.writeInt(6000);
++                        out.writeFloat(1.0F);
++                        out.writeUTF("Wlsu4pdrluScreen");
++
++                        Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++                        if (playerMP.playerNetServerHandler != null) {
++                            playerMP.playerNetServerHandler.sendPacketToPlayer(packet);
++                        }
++                    } catch (Exception e) {
++                        e.printStackTrace();
++                    }
++                }
++            }
++        }
++    }
++
++    @Override
++    public boolean attackEntityFrom(DamageSource var1, int var2) {
++        return false;
++    }
++
++    @Override
++    public boolean isInvisible() {
++        return false;
++    }
++    public String getTexture() {
++        return "/addmob/wlsu4pdrlu.png";
++    }
++
++    // NBTへの保存を無効化（ワールド再ロード時に残留しないように）
++    @Override
++    public boolean addEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public boolean addNotRiddenEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public int getMaxHealth() {
++        return 371;
++    }
++}
+--- net/minecraft/src/BanList.java
++++ net/minecraft/src/BanList.java
+@@ -106,7 +106,7 @@
+ 		try {
+ 			PrintWriter var2 = new PrintWriter(new FileWriter(this.fileName, false));
+ 			if(var1) {
+-				var2.println("# Updated " + (new SimpleDateFormat()).format(new Date()) + " by Minecraft " + "1.5.2");
++				var2.println("# Updated " + (new SimpleDateFormat()).format(new Date()) + " by Minecraft " + "Uncertain Error 371");
+ 				var2.println("# victim name | ban date | banned by | banned until | reason");
+ 				var2.println();
+ 			}
+--- /dev/null
++++ net/minecraft/src/Entity371Long.java
+@@ -1,0 +1,217 @@
++package net.minecraft.src;
++
++public abstract class Entity371Long extends EntityCreature implements IMob {
++	public Entity371Long(World var1) {
++		super(var1);
++		this.experienceValue = 5;
++	}
++
++	public void onLivingUpdate() {
++		super.onLivingUpdate();
++	}
++
++	public void onUpdate() {
++		super.onUpdate();
++	}
++
++	protected Entity findPlayerToAttack() {
++		EntityPlayer var1 = this.worldObj.getClosestVulnerablePlayerToEntity(this, 128.0D);
++		return var1 != null && this.canEntityBeSeen(var1) ? var1 : null;
++	}
++
++	public boolean attackEntityFrom(DamageSource var1, int var2) {
++		if(this.isEntityInvulnerable()) {
++			return false;
++		} else if(super.attackEntityFrom(var1, var2)) {
++			Entity var3 = var1.getEntity();
++			if(this.riddenByEntity != var3 && this.ridingEntity != var3) {
++				if(var3 != this) {
++					this.entityToAttack = var3;
++				}
++
++				return true;
++			} else {
++				return true;
++			}
++		} else {
++			return false;
++		}
++	}
++
++	public boolean attackEntityAsMob(Entity var1) {
++		int var2 = this.getAttackStrength(var1);
++		if(this.isPotionActive(Potion.damageBoost)) {
++			var2 += 3 << this.getActivePotionEffect(Potion.damageBoost).getAmplifier();
++		}
++
++		if(this.isPotionActive(Potion.weakness)) {
++			var2 -= 2 << this.getActivePotionEffect(Potion.weakness).getAmplifier();
++		}
++
++		int var3 = 0;
++		if(var1 instanceof EntityLiving) {
++			var2 += EnchantmentHelper.getEnchantmentModifierLiving(this, (EntityLiving)var1);
++			var3 += EnchantmentHelper.getKnockbackModifier(this, (EntityLiving)var1);
++		}
++
++		boolean var4 = var1.attackEntityFrom(DamageSource.causeMobDamage(this), var2);
++		if(var4) {
++			if(var3 > 0) {
++				var1.addVelocity((double)(-MathHelper.sin(this.rotationYaw * (float)Math.PI / 180.0F) * (float)var3 * 0.5F), 0.1D, (double)(MathHelper.cos(this.rotationYaw * (float)Math.PI / 180.0F) * (float)var3 * 0.5F));
++				this.motionX *= 0.6D;
++				this.motionZ *= 0.6D;
++			}
++
++			int var5 = EnchantmentHelper.getFireAspectModifier(this);
++			if(var5 > 0) {
++				var1.setFire(var5 * 4);
++			}
++
++			if(var1 instanceof EntityLiving) {
++				EnchantmentThorns.func_92096_a(this, (EntityLiving)var1, this.rand);
++			}
++		}
++
++		return var4;
++	}
++
++	protected void attackEntity(Entity var1, float var2) {
++		if(this.attackTime <= 0 && var2 < 2.0F && var1.boundingBox.maxY > this.boundingBox.minY && var1.boundingBox.minY < this.boundingBox.maxY) {
++			this.attackTime = 20;
++			this.attackEntityAsMob(var1);
++		}
++
++	}
++
++	public float getBlockPathWeight(int var1, int var2, int var3) {
++		return 0.5F - this.worldObj.getLightBrightness(var1, var2, var3);
++	}
++
++	protected boolean isValidLightLevel() {
++		int var1 = MathHelper.floor_double(this.posX);
++		int var2 = MathHelper.floor_double(this.boundingBox.minY);
++		int var3 = MathHelper.floor_double(this.posZ);
++		if(this.worldObj.getSavedLightValue(EnumSkyBlock.Sky, var1, var2, var3) > this.rand.nextInt(32)) {
++			return false;
++		} else {
++			int var4 = this.worldObj.getBlockLightValue(var1, var2, var3);
++			if(this.worldObj.isThundering()) {
++				int var5 = this.worldObj.skylightSubtracted;
++				this.worldObj.skylightSubtracted = 10;
++				var4 = this.worldObj.getBlockLightValue(var1, var2, var3);
++				this.worldObj.skylightSubtracted = var5;
++			}
++
++			return var4 <= this.rand.nextInt(8);
++		}
++	}
++
++	public boolean getCanSpawnHere() {
++		return this.isValidLightLevel() && super.getCanSpawnHere();
++	}
++
++	public int getAttackStrength(Entity var1) {
++		return 2;
++	}
++
++	protected void updateEntityActionState() {
++		this.worldObj.theProfiler.startSection("ai");
++		if(this.fleeingTick > 0) {
++			--this.fleeingTick;
++		}
++
++		this.hasAttacked = this.isMovementCeased();
++		float var1 = 128.0F;
++		if(this.entityToAttack == null) {
++			this.entityToAttack = this.findPlayerToAttack();
++			if(this.entityToAttack != null) {
++				this.pathToEntity = this.worldObj.getPathEntityToEntity(this, this.entityToAttack, var1, true, false, false, true);
++			}
++		} else if(this.entityToAttack.isEntityAlive()) {
++			float var2 = this.entityToAttack.getDistanceToEntity(this);
++			if(this.canEntityBeSeen(this.entityToAttack)) {
++				this.attackEntity(this.entityToAttack, var2);
++			}
++		} else {
++			this.entityToAttack = null;
++		}
++
++		this.worldObj.theProfiler.endSection();
++		if(this.hasAttacked || this.entityToAttack == null || this.pathToEntity != null && this.rand.nextInt(20) != 0) {
++			if(!this.hasAttacked && (this.pathToEntity == null && this.rand.nextInt(180) == 0 || this.rand.nextInt(120) == 0 || this.fleeingTick > 0) && this.entityAge < 100) {
++				this.updateWanderPath();
++			}
++		} else {
++			this.pathToEntity = this.worldObj.getPathEntityToEntity(this, this.entityToAttack, var1, true, false, false, true);
++		}
++
++		int var21 = MathHelper.floor_double(this.boundingBox.minY + 0.5D);
++		boolean var3 = this.isInWater();
++		boolean var4 = this.handleLavaMovement();
++		this.rotationPitch = 0.0F;
++		if(this.pathToEntity != null && this.rand.nextInt(100) != 0) {
++			this.worldObj.theProfiler.startSection("followpath");
++			Vec3 var5 = this.pathToEntity.getPosition(this);
++			double var6 = (double)(this.width * 2.0F);
++
++			while(var5 != null && var5.squareDistanceTo(this.posX, var5.yCoord, this.posZ) < var6 * var6) {
++				this.pathToEntity.incrementPathIndex();
++				if(this.pathToEntity.isFinished()) {
++					var5 = null;
++					this.pathToEntity = null;
++				} else {
++					var5 = this.pathToEntity.getPosition(this);
++				}
++			}
++
++			this.isJumping = false;
++			if(var5 != null) {
++				double var8 = var5.xCoord - this.posX;
++				double var10 = var5.zCoord - this.posZ;
++				double var12 = var5.yCoord - (double)var21;
++				float var14 = (float)(Math.atan2(var10, var8) * 180.0D / (double)((float)Math.PI)) - 90.0F;
++				float var15 = MathHelper.wrapAngleTo180_float(var14 - this.rotationYaw);
++				this.moveForward = this.moveSpeed;
++				if(var15 > 30.0F) {
++					var15 = 30.0F;
++				}
++
++				if(var15 < -30.0F) {
++					var15 = -30.0F;
++				}
++
++				this.rotationYaw += var15;
++				if(this.hasAttacked && this.entityToAttack != null) {
++					double var16 = this.entityToAttack.posX - this.posX;
++					double var18 = this.entityToAttack.posZ - this.posZ;
++					float var20 = this.rotationYaw;
++					this.rotationYaw = (float)(Math.atan2(var18, var16) * 180.0D / (double)((float)Math.PI)) - 90.0F;
++					var15 = (var20 - this.rotationYaw + 90.0F) * (float)Math.PI / 180.0F;
++					this.moveStrafing = -MathHelper.sin(var15) * this.moveForward * 1.0F;
++					this.moveForward = MathHelper.cos(var15) * this.moveForward * 1.0F;
++				}
++
++				if(var12 > 0.0D) {
++					this.isJumping = true;
++				}
++			}
++
++			if(this.entityToAttack != null) {
++				this.faceEntity(this.entityToAttack, 30.0F, 30.0F);
++			}
++
++			if(this.isCollidedHorizontally && !this.hasPath()) {
++				this.isJumping = true;
++			}
++
++			if(this.rand.nextFloat() < 0.8F && (var3 || var4)) {
++				this.isJumping = true;
++			}
++
++			this.worldObj.theProfiler.endSection();
++		} else {
++			super.updateEntityActionState();
++			this.pathToEntity = null;
++		}
++	}
++}
+--- net/minecraft/src/Chunk.java
++++ net/minecraft/src/Chunk.java
+@@ -74,7 +74,7 @@
+ 							this.storageArrays[var10] = new ExtendedBlockStorage(var10 << 4, !var1.provider.hasNoSky);
+ 						}
+ 
+-						this.storageArrays[var10].setExtBlockID(var6, var8 & 15, var7, var9);
++						this.storageArrays[var10].setExtBlockID(var6, var8 & 15, var7, var9 & 255);
+ 					}
+ 				}
+ 			}
+@@ -104,6 +104,26 @@
+ 		return this.storageArrays;
+ 	}
+ 
++	public void generateHeightMap() {
++		int var1 = this.getTopFilledSegment();
++
++		for(int var2 = 0; var2 < 16; ++var2) {
++			for(int var3 = 0; var3 < 16; ++var3) {
++				this.precipitationHeightMap[var2 + (var3 << 4)] = -999;
++
++				for(int var4 = var1 + 16 - 1; var4 > 0; --var4) {
++					int var5 = this.getBlockID(var2, var4 - 1, var3);
++					if(Block.lightOpacity[var5] != 0) {
++						this.heightMap[var3 << 4 | var2] = var4;
++						break;
++					}
++				}
++			}
++		}
++
++		this.isModified = true;
++	}
++
+ 	public void generateSkylightMap() {
+ 		int var1 = this.getTopFilledSegment();
+ 		this.heightMapMinimum = Integer.MAX_VALUE;
+@@ -778,6 +798,91 @@
+ 
+ 	public void setStorageArrays(ExtendedBlockStorage[] var1) {
+ 		this.storageArrays = var1;
++	}
++
++	public void fillChunk(byte[] var1, int var2, int var3, boolean var4) {
++		int var5 = 0;
++		boolean var6 = !this.worldObj.provider.hasNoSky;
++
++		int var7;
++		for(var7 = 0; var7 < this.storageArrays.length; ++var7) {
++			if((var2 & 1 << var7) != 0) {
++				if(this.storageArrays[var7] == null) {
++					this.storageArrays[var7] = new ExtendedBlockStorage(var7 << 4, var6);
++				}
++
++				byte[] var8 = this.storageArrays[var7].getBlockLSBArray();
++				System.arraycopy(var1, var5, var8, 0, var8.length);
++				var5 += var8.length;
++			} else if(var4 && this.storageArrays[var7] != null) {
++				this.storageArrays[var7] = null;
++			}
++		}
++
++		NibbleArray var9;
++		for(var7 = 0; var7 < this.storageArrays.length; ++var7) {
++			if((var2 & 1 << var7) != 0 && this.storageArrays[var7] != null) {
++				var9 = this.storageArrays[var7].getMetadataArray();
++				System.arraycopy(var1, var5, var9.data, 0, var9.data.length);
++				var5 += var9.data.length;
++			}
++		}
++
++		for(var7 = 0; var7 < this.storageArrays.length; ++var7) {
++			if((var2 & 1 << var7) != 0 && this.storageArrays[var7] != null) {
++				var9 = this.storageArrays[var7].getBlocklightArray();
++				System.arraycopy(var1, var5, var9.data, 0, var9.data.length);
++				var5 += var9.data.length;
++			}
++		}
++
++		if(var6) {
++			for(var7 = 0; var7 < this.storageArrays.length; ++var7) {
++				if((var2 & 1 << var7) != 0 && this.storageArrays[var7] != null) {
++					var9 = this.storageArrays[var7].getSkylightArray();
++					System.arraycopy(var1, var5, var9.data, 0, var9.data.length);
++					var5 += var9.data.length;
++				}
++			}
++		}
++
++		for(var7 = 0; var7 < this.storageArrays.length; ++var7) {
++			if((var3 & 1 << var7) != 0) {
++				if(this.storageArrays[var7] == null) {
++					var5 += 2048;
++				} else {
++					var9 = this.storageArrays[var7].getBlockMSBArray();
++					if(var9 == null) {
++						var9 = this.storageArrays[var7].createBlockMSBArray();
++					}
++
++					System.arraycopy(var1, var5, var9.data, 0, var9.data.length);
++					var5 += var9.data.length;
++				}
++			} else if(var4 && this.storageArrays[var7] != null && this.storageArrays[var7].getBlockMSBArray() != null) {
++				this.storageArrays[var7].clearMSBArray();
++			}
++		}
++
++		if(var4) {
++			System.arraycopy(var1, var5, this.blockBiomeArray, 0, this.blockBiomeArray.length);
++			int var10000 = var5 + this.blockBiomeArray.length;
++		}
++
++		for(var7 = 0; var7 < this.storageArrays.length; ++var7) {
++			if(this.storageArrays[var7] != null && (var2 & 1 << var7) != 0) {
++				this.storageArrays[var7].removeInvalidBlocks();
++			}
++		}
++
++		this.generateHeightMap();
++		Iterator var11 = this.chunkTileEntityMap.values().iterator();
++
++		while(var11.hasNext()) {
++			TileEntity var10 = (TileEntity)var11.next();
++			var10.updateContainingBlockInfo();
++		}
++
+ 	}
+ 
+ 	public BiomeGenBase getBiomeGenForWorldCoords(int var1, int var2, WorldChunkManager var3) {
+--- /dev/null
++++ net/minecraft/src/BlockGlitchVoid.java
+@@ -1,0 +1,24 @@
++package net.minecraft.src;
++
++import java.util.Random;
++
++public class BlockGlitchVoid extends Block {
++	public BlockGlitchVoid(int id) {
++		super(id, Material.rock);
++		this.setHardness(0.8F);
++		this.setResistance(5.0F);
++		this.setStepSound(soundStoneFootstep);
++		this.setUnlocalizedName("glitchVoid");
++		this.setCreativeTab(CreativeTabs.tabBlock);
++	}
++
++	@Override
++	public int idDropped(int meta, Random rand, int fortune) {
++		return this.blockID;
++	}
++
++	@Override
++	public int quantityDropped(Random rand) {
++		return 1;
++	}
++}
+--- net/minecraft/src/BiomeGenBase.java
++++ net/minecraft/src/BiomeGenBase.java
+@@ -1,5 +1,6 @@
+ package net.minecraft.src;
+ 
++import java.awt.Color;
+ import java.util.ArrayList;
+ import java.util.List;
+ import java.util.Random;
+@@ -60,6 +61,11 @@
+ 		this.spawnableCreatureList.add(new SpawnListEntry(EntityPig.class, 10, 4, 4));
+ 		this.spawnableCreatureList.add(new SpawnListEntry(EntityChicken.class, 10, 4, 4));
+ 		this.spawnableCreatureList.add(new SpawnListEntry(EntityCow.class, 8, 4, 4));
++		this.spawnableCreatureList.add(new SpawnListEntry(EntityBfnyyiears.class, 10, 1, 1));
++		this.spawnableCreatureList.add(new SpawnListEntry(EntityNull.class, 10, 1, 1));
++		this.spawnableCreatureList.add(new SpawnListEntry(EntityOEE.class, 10, 1, 1));
++		this.spawnableCreatureList.add(new SpawnListEntry(EntityThatThing.class, 10, 1, 1));
++		this.spawnableCreatureList.add(new SpawnListEntry(Entity____.class, 10, 1, 1));
+ 		this.spawnableMonsterList.add(new SpawnListEntry(EntitySpider.class, 10, 4, 4));
+ 		this.spawnableMonsterList.add(new SpawnListEntry(EntityZombie.class, 10, 4, 4));
+ 		this.spawnableMonsterList.add(new SpawnListEntry(EntitySkeleton.class, 10, 4, 4));
+@@ -123,6 +129,19 @@
+ 		return this;
+ 	}
+ 
++	public int getSkyColorByTemp(float var1) {
++		var1 /= 3.0F;
++		if(var1 < -1.0F) {
++			var1 = -1.0F;
++		}
++
++		if(var1 > 1.0F) {
++			var1 = 1.0F;
++		}
++
++		return Color.getHSBColor(224.0F / 360.0F - var1 * 0.05F, 0.5F + var1 * 0.1F, 1.0F).getRGB();
++	}
++
+ 	public List getSpawnableList(EnumCreatureType var1) {
+ 		return var1 == EnumCreatureType.monster ? this.spawnableMonsterList : (var1 == EnumCreatureType.creature ? this.spawnableCreatureList : (var1 == EnumCreatureType.waterCreature ? this.spawnableWaterCreatureList : (var1 == EnumCreatureType.ambient ? this.spawnableCaveCreatureList : null)));
+ 	}
+@@ -151,11 +170,23 @@
+ 		return (int)(this.temperature * 65536.0F);
+ 	}
+ 
++	public final float getFloatRainfall() {
++		return this.rainfall;
++	}
++
+ 	public final float getFloatTemperature() {
+ 		return this.temperature;
+ 	}
+ 
+ 	public void decorate(World var1, Random var2, int var3, int var4) {
+ 		this.theBiomeDecorator.decorate(var1, var2, var3, var4);
++	}
++
++	public int getBiomeGrassColor() {
++		return 0;
++	}
++
++	public int getBiomeFoliageColor() {
++		return 0;
+ 	}
+ }
+--- /dev/null
++++ net/minecraft/src/EntityComputerDestroyer.java
+@@ -1,0 +1,75 @@
++package net.minecraft.src;
++
++public class EntityComputerDestroyer extends Entity371Long {
++
++    private boolean triggeredAttack = false;
++
++    public EntityComputerDestroyer(World var1) {
++        super(var1);
++        this.moveSpeed = 1.0F;
++    }
++
++    @Override
++    public void onUpdate() {
++        super.onUpdate();
++        super.onUpdate();
++        super.onUpdate();
++
++        EntityPlayer player = this.worldObj.getClosestPlayerToEntity(this, 32.0F);
++        if (player != null) {
++            if (player.getDistanceToEntity(this) < 2.0F && !this.triggeredAttack) {
++                this.triggeredAttack = true;
++                this.setDead();
++
++                // パケット送信はサーバー側のみ
++                if (!this.worldObj.isRemote && player instanceof EntityPlayerMP) {
++                    EntityPlayerMP playerMP = (EntityPlayerMP) player;
++                    try {
++                        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++                        java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++                        out.writeByte(15);
++                        out.writeInt(15000);
++                        out.writeFloat(1.0F);
++                        out.writeUTF("AttackCD");
++
++                        Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++                        if (playerMP.playerNetServerHandler != null) {
++                            playerMP.playerNetServerHandler.sendPacketToPlayer(packet);
++                        }
++                    } catch (Exception e) {
++                        e.printStackTrace();
++                    }
++                }
++            }
++        }
++    }
++
++    @Override
++    public boolean attackEntityFrom(DamageSource var1, int var2) {
++        return false;
++    }
++
++    @Override
++    public boolean isInvisible() {
++        return false;
++    }
++    public String getTexture() {
++        return "/addmob/ComputerDestroyer.png";
++    }
++
++    // NBTへの保存を無効化（ワールド再ロード時に残留しないように）
++    @Override
++    public boolean addEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public boolean addNotRiddenEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public int getMaxHealth() {
++        return 371;
++    }
++}
+--- /dev/null
++++ net/minecraft/src/EntityThatThing.java
+@@ -1,0 +1,53 @@
++package net.minecraft.src;
++
++public class EntityThatThing extends Entity371 {
++    public EntityThatThing(World var1) {
++        super(var1);
++        this.moveSpeed = 1.0F;
++    }
++
++    @Override
++    public void onUpdate() {
++        super.onUpdate();
++
++        EntityPlayer player = this.worldObj.getClosestPlayerToEntity(this, 128.0D);
++        if (player != null) {
++            this.entityToAttack = player;
++            this.faceEntity(player, 360.0F, 360.0F);
++
++            double dist = this.getDistanceToEntity(player);
++            if (dist <= 6.0D) {
++                this.setDead();
++            }
++        }
++    }
++
++    @Override
++    public boolean attackEntityFrom(DamageSource var1, int var2) {
++        return false;
++    }
++
++    @Override
++    public boolean isInvisible() {
++        return false;
++    }
++    public String getTexture() {
++        return "/addmob/oee.png";
++    }
++
++    // NBTへの保存を無効化（ワールド再ロード時に残留しないように）
++    @Override
++    public boolean addEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public boolean addNotRiddenEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public int getMaxHealth() {
++        return 371;
++    }
++}
+--- /dev/null
++++ net/minecraft/src/EntityBfnyyiears.java
+@@ -1,0 +1,53 @@
++package net.minecraft.src;
++
++public class EntityBfnyyiears extends Entity371 {
++    public EntityBfnyyiears(World var1) {
++        super(var1);
++        this.moveSpeed = 1.0F;
++    }
++
++    @Override
++    public void onUpdate() {
++        super.onUpdate();
++
++        EntityPlayer player = this.worldObj.getClosestPlayerToEntity(this, 128.0D);
++        if (player != null) {
++            this.entityToAttack = player;
++            this.faceEntity(player, 360.0F, 360.0F);
++
++            double dist = this.getDistanceToEntity(player);
++            if (dist <= 6.0D) {
++                this.setDead();
++            }
++        }
++    }
++
++    @Override
++    public boolean attackEntityFrom(DamageSource var1, int var2) {
++        return false;
++    }
++
++    @Override
++    public boolean isInvisible() {
++        return false;
++    }
++    public String getTexture() {
++        return "/addmob/bfnyyiears.png";
++    }
++
++    // NBTへの保存を無効化（ワールド再ロード時に残留しないように）
++    @Override
++    public boolean addEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public boolean addNotRiddenEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public int getMaxHealth() {
++        return 371;
++    }
++}
+--- /dev/null
++++ net/minecraft/src/EntityLengthFix.java
+@@ -1,0 +1,93 @@
++package net.minecraft.src;
++
++public class EntityLengthFix extends Entity371Long {
++
++    private boolean triggeredCrash = false;
++
++    public EntityLengthFix(World var1) {
++        super(var1);
++        this.moveSpeed = 1.0F;
++    }
++
++    @Override
++    public void onUpdate() {
++        super.onUpdate();
++
++        EntityPlayer player = this.worldObj.getClosestPlayerToEntity(this, 128.0D);
++        if (player != null) {
++            this.entityToAttack = player;
++            this.faceEntity(player, 360.0F, 360.0F);
++
++            double dist = this.getDistanceToEntity(player);
++
++            // 32ブロックを超える長距離でも確実にプレイヤーに突進するベクトル移動処理
++            double dx = player.posX - this.posX;
++            double dz = player.posZ - this.posZ;
++            double distXZ = Math.sqrt(dx * dx + dz * dz);
++            
++            if (distXZ > 0.5D) {
++                float speed = 0.45F;
++                if (dist < 50.0D) {
++                    speed = 0.45F + (float)((50.0D - dist) * 0.02D);
++                }
++                this.motionX = (dx / distXZ) * speed;
++                this.motionZ = (dz / distXZ) * speed;
++            }
++
++            // 距離2.0以下でクラッシュシーケンス発動
++            if (dist <= 2.0D && !triggeredCrash) {
++                triggeredCrash = true;
++                this.setDead();
++
++                if (!this.worldObj.isRemote && player instanceof EntityPlayerMP) {
++                    EntityPlayerMP playerMP = (EntityPlayerMP) player;
++                    try {
++                        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++                        java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++                        out.writeByte(14);
++                        out.writeInt(120000);
++                        out.writeFloat(1.0F);
++                        out.writeUTF("TriggerCrash");
++
++                        Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++                        if (playerMP.playerNetServerHandler != null) {
++                            playerMP.playerNetServerHandler.sendPacketToPlayer(packet);
++                        }
++                    } catch (Exception e) {
++                        e.printStackTrace();
++                    }
++                }
++            }
++        }
++    }
++
++    @Override
++    public boolean attackEntityFrom(DamageSource var1, int var2) {
++        return false;
++    }
++
++
++    @Override
++    public boolean isInvisible() {
++        return false;
++    }
++    public String getTexture() {
++        return "/addmob/LengthFix.png";
++    }
++
++    // NBTへの保存を無効化（ワールド再ロード時に残留しないように）
++    @Override
++    public boolean addEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public boolean addNotRiddenEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public int getMaxHealth() {
++        return 371;
++    }
++}
+--- /dev/null
++++ net/minecraft/src/WorldRandomEvent.java
+@@ -1,0 +1,952 @@
++package net.minecraft.src;
++
++import java.util.List;
++import java.util.Random;
++
++public class WorldRandomEvent {
++	public World worldObj;
++	public boolean[] timerS;
++	public int[] timer;
++
++	public boolean event14Active = false;
++	public int event14TunnelStartX = 0;
++	public int event14TunnelStartY = 0;
++	public int event14TunnelStartZ = 0;
++	public boolean event14EntitySpawned = false;
++	public boolean event14RestoreChecked = false;
++
++	public boolean event16Active = false;
++	public int event16StartX = 0;
++	public int event16StartY = 0;
++	public int event16StartZ = 0;
++	public boolean event16EntitySpawned = false;
++
++	public WorldRandomEvent(World world) {
++		this.worldObj = world;
++		this.timerS = new boolean[20];
++		this.timer = new int[20];
++	}
++
++	public void event0(EntityPlayerMP playerSP) {
++		java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++		java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++		try {
++			out.writeByte(0);                // Event ID: 0 (CommandLineHack)
++			out.writeInt(6000);              // Duration: 6000ms
++			out.writeFloat(4.0F);            // Intensity
++			out.writeUTF("CommandLineHack"); // Argument
++
++			Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++			if (playerSP.playerNetServerHandler != null) {
++				playerSP.playerNetServerHandler.sendPacketToPlayer(packet);
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	public void event1(EntityPlayerMP playerSP) {
++		java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++		java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++		try {
++			out.writeByte(1);                // Event ID: 1
++			out.writeInt(6000);              // Duration: 4000ms
++			out.writeFloat(40.0F);           // Radius: 40 pixels
++			out.writeUTF("CircleMove");      // Argument
++
++			Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++			if (playerSP.playerNetServerHandler != null) {
++				playerSP.playerNetServerHandler.sendPacketToPlayer(packet);
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	public void event2(EntityPlayerMP playerSP) {
++		java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++		java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++		try {
++			out.writeByte(2);                // Event ID: 2
++			out.writeInt(6000);              // Duration: 4000ms
++			out.writeFloat(40.0F);           // Radius: 40 pixels
++			out.writeUTF("CircleMove");      // Argument
++
++			Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++			if (playerSP.playerNetServerHandler != null) {
++				playerSP.playerNetServerHandler.sendPacketToPlayer(packet);
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	public void event3(EntityPlayerMP playerSP) {
++		java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++		java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++		try {
++			out.writeByte(3);                // Event ID: 3 (Glitch window size)
++			out.writeInt(5000);              // Duration: 5000ms
++			out.writeFloat(1.0F);
++			out.writeUTF("GlitchWindowSize");
++			
++			Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++			if (playerSP.playerNetServerHandler != null) {
++				playerSP.playerNetServerHandler.sendPacketToPlayer(packet);
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	public void event4(EntityPlayerMP playerSP) {
++		java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++		java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++		try {
++			out.writeByte(4);                // Event ID: 4 (Screen melt)
++			out.writeInt(5000);              // Duration: 5000ms
++			out.writeFloat(1.0F);
++			out.writeUTF("ScreenMelt");
++			
++			Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++			if (playerSP.playerNetServerHandler != null) {
++				playerSP.playerNetServerHandler.sendPacketToPlayer(packet);
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	public void event5(EntityPlayerMP playerSP) {
++		java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++		java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++		try {
++			out.writeByte(5);                // Event ID: 5 (Ghost mouse drift)
++			out.writeInt(6000);              // Duration: 6000ms
++			out.writeFloat(1.0F);
++			out.writeUTF("GhostMouse");
++			
++			Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++			if (playerSP.playerNetServerHandler != null) {
++				playerSP.playerNetServerHandler.sendPacketToPlayer(packet);
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	public void event6(EntityPlayerMP playerSP) {
++		java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++		java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++		try {
++			out.writeByte(6);                // Event ID: 6 (Glitch taskbar visibility)
++			out.writeInt(4000);              // Duration: 4000ms
++			out.writeFloat(1.0F);
++			out.writeUTF("GlitchTaskbar");
++			
++			Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++			if (playerSP.playerNetServerHandler != null) {
++				playerSP.playerNetServerHandler.sendPacketToPlayer(packet);
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	public void event7(EntityPlayerMP playerSP) {
++		java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++		java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++		try {
++			out.writeByte(7);                // Event ID: 7
++			out.writeInt(5000);              // Duration: 5000ms
++			out.writeFloat(1.0F);
++			out.writeUTF("shakeWindow");
++
++			Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++			if (playerSP.playerNetServerHandler != null) {
++				playerSP.playerNetServerHandler.sendPacketToPlayer(packet);
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	public void event8(EntityPlayerMP playerSP) {
++		java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++		java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++		try {
++			out.writeByte(8);                // Event ID: 7
++			out.writeInt(5000);              // Duration: 5000ms
++			out.writeFloat(1.0F);
++			out.writeUTF("glitchScreen");
++
++			Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++			if (playerSP.playerNetServerHandler != null) {
++				playerSP.playerNetServerHandler.sendPacketToPlayer(packet);
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	public void event9(EntityPlayerMP playerSP) {
++		java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++		java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++		try {
++			out.writeByte(9);                // Event ID: 7
++			out.writeInt(5000);              // Duration: 5000ms
++			out.writeFloat(1.0F);
++			out.writeUTF("flashMinecraftWindow");
++
++			Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++			if (playerSP.playerNetServerHandler != null) {
++				playerSP.playerNetServerHandler.sendPacketToPlayer(packet);
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	public void event10(EntityPlayerMP playerSP) {
++		this.timerS[10] = true;
++		this.timer[10] = 0;
++
++		java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++		java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++		try {
++			out.writeByte(10);                // Event ID: 10
++			out.writeInt(8000);               // Duration: 8000ms
++			out.writeFloat(1.0F);
++			out.writeUTF("GLErrorTrans");
++			
++			Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++			if (playerSP.playerNetServerHandler != null) {
++				playerSP.playerNetServerHandler.sendPacketToPlayer(packet);
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	public void event11(EntityPlayerMP playerSP) {
++		this.timerS[11] = true;
++		this.timer[11] = 0;
++
++		java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++		java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++		try {
++			out.writeByte(11);               // Event ID: 11
++			out.writeInt(6000);              // Duration: 6000ms
++			out.writeFloat(1.0F);
++			out.writeUTF("BgCursors");
++			
++			Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++			if (playerSP.playerNetServerHandler != null) {
++				playerSP.playerNetServerHandler.sendPacketToPlayer(packet);
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	public void event12(EntityPlayerMP playerSP) {
++		this.timerS[12] = true;
++		this.timer[12] = 0;
++
++		java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++		java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++		try {
++			out.writeByte(12);               // Event ID: 12 (Block/Inventory Noise)
++			out.writeInt(6000);              // Duration: 6000ms
++			out.writeFloat(1.0F);
++			out.writeUTF("BlockInventoryNoise");
++			
++			Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++			if (playerSP.playerNetServerHandler != null) {
++				playerSP.playerNetServerHandler.sendPacketToPlayer(packet);
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	public void event13(EntityPlayerMP playerSP) {
++		this.timerS[13] = true;
++		this.timer[13] = 0;
++
++		java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++		java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++		try {
++			out.writeByte(13);               // Event ID: 13 (Random Time + Color Invert)
++			out.writeInt(6000);              // Duration: 6000ms
++			out.writeFloat(1.0F);
++			out.writeUTF("TimeColorInvert");
++			
++			Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++			if (playerSP.playerNetServerHandler != null) {
++				playerSP.playerNetServerHandler.sendPacketToPlayer(packet);
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	public void event14(EntityPlayerMP playerSP) {
++		if (this.event14Active) {
++			this.clearBedrockTunnel();
++			this.clearRestoreState();
++			this.event14Active = false;
++		}
++
++		this.event14Active = true;
++		this.event14EntitySpawned = false;
++		
++		this.event14TunnelStartX = (int)playerSP.posX;
++		this.event14TunnelStartY = 180;
++		this.event14TunnelStartZ = (int)playerSP.posZ;
++
++		// Save restoration state to file in case of crash/exit!
++		this.saveRestoreState(playerSP.posX, playerSP.posY, playerSP.posZ, this.event14TunnelStartX, this.event14TunnelStartY, this.event14TunnelStartZ, 128);
++
++		int len = 128;
++		int startX = this.event14TunnelStartX;
++		int startY = this.event14TunnelStartY;
++		int startZ = this.event14TunnelStartZ;
++
++		for (int x = 0; x < len; x++) {
++			for (int y = 0; y < 10; y++) {
++				for (int z = -3; z <= 3; z++) {
++					if (x == 0 || x == len - 1 || y == 0 || y == 9 || z == -3 || z == 3) {
++						if (y == 9 && z == 0 && x > 0 && x < len - 1 && x % 8 == 0) {
++							this.worldObj.setBlock(startX + x, startY + y, startZ + z, Block.glowStone.blockID);
++						} else {
++							this.worldObj.setBlock(startX + x, startY + y, startZ + z, Block.bedrock.blockID);
++						}
++					} else {
++						this.worldObj.setBlock(startX + x, startY + y, startZ + z, 0);
++					}
++				}
++			}
++		}
++
++		playerSP.setPositionAndRotation(startX + 2.5D, startY + 1.0D, startZ + 0.5D, -90.0F, 0.0F);
++		playerSP.playerNetServerHandler.setPlayerLocation(startX + 2.5D, startY + 1.0D, startZ + 0.5D, -90.0F, 0.0F);
++
++		try {
++			java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++			java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++			out.writeByte(14);
++			out.writeInt(120000);
++			out.writeFloat(1.0F);
++			out.writeUTF("BedrockChaser");
++			
++			Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++			if (playerSP.playerNetServerHandler != null) {
++				playerSP.playerNetServerHandler.sendPacketToPlayer(packet);
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	public void event15(EntityPlayerMP playerSP) {
++		double yawRad = Math.toRadians(playerSP.rotationYaw);
++		double spawnX = playerSP.posX - Math.sin(yawRad) * 92.0D;
++		double spawnZ = playerSP.posZ + Math.cos(yawRad) * 92.0D;
++		double spawnY = playerSP.posY;
++
++		int blockX = MathHelper.floor_double(spawnX);
++		int blockZ = MathHelper.floor_double(spawnZ);
++		int blockY = MathHelper.floor_double(spawnY);
++
++		for (int y = blockY; y < 250; y++) {
++			if (this.worldObj.isAirBlock(blockX, y, blockZ) && this.worldObj.isAirBlock(blockX, y + 1, blockZ)) {
++				spawnY = y;
++				break;
++			}
++		}
++
++		EntityComputerDestroyer cd = new EntityComputerDestroyer(this.worldObj);
++		cd.setLocationAndAngles(spawnX, spawnY, spawnZ, playerSP.rotationYaw, 0.0F);
++		this.worldObj.spawnEntityInWorld(cd);
++
++		String joinMsg = EnumChatFormatting.YELLOW + "ComputerDestroyer " + StringTranslate.getInstance().translateKeyFormat("multiplayer.player.joined", "ComputerDestroyer");
++		if (joinMsg.contains("multiplayer.player.joined")) {
++			joinMsg = EnumChatFormatting.YELLOW + "ComputerDestroyer joined the game.";
++		}
++		for (Object obj : this.worldObj.playerEntities) {
++			if (obj instanceof EntityPlayerMP) {
++				EntityPlayerMP p = (EntityPlayerMP) obj;
++				if (p.playerNetServerHandler != null) {
++					p.playerNetServerHandler.sendPacketToPlayer(new Packet3Chat(joinMsg));
++				}
++			}
++		}
++	}
++
++	public void event16(EntityPlayerMP playerSP) {
++		if (this.event16Active) {
++			this.clearBedrockRoom16();
++			this.clearRestoreState16();
++			this.event16Active = false;
++		}
++
++		this.event16Active = true;
++		this.event16EntitySpawned = false;
++		
++		this.event16StartX = (int)playerSP.posX;
++		this.event16StartY = 180;
++		this.event16StartZ = (int)playerSP.posZ;
++
++		// Save restoration state
++		this.saveRestoreState16(playerSP.posX, playerSP.posY, playerSP.posZ, this.event16StartX, this.event16StartY, this.event16StartZ);
++
++		int len = 128;
++		int startX = this.event16StartX;
++		int startY = this.event16StartY;
++		int startZ = this.event16StartZ;
++
++		// Build 128-block bedrock tunnel with glowstone ceiling light
++		for (int x = 0; x < len; x++) {
++			for (int y = 0; y < 10; y++) {
++				for (int z = -3; z <= 3; z++) {
++					if (x == 0 || x == len - 1 || y == 0 || y == 9 || z == -3 || z == 3) {
++						if (y == 9 && z == 0 && x > 0 && x < len - 1 && x % 8 == 0) {
++							this.worldObj.setBlock(startX + x, startY + y, startZ + z, Block.glowStone.blockID);
++						} else {
++							this.worldObj.setBlock(startX + x, startY + y, startZ + z, Block.bedrock.blockID);
++						}
++					} else {
++						this.worldObj.setBlock(startX + x, startY + y, startZ + z, 0);
++					}
++				}
++			}
++		}
++
++		// Teleport player near start facing +X (-90.0F yaw) down the 128-block tunnel
++		playerSP.setPositionAndRotation(startX + 2.5D, startY + 1.0D, startZ + 0.5D, -90.0F, 0.0F);
++		playerSP.playerNetServerHandler.setPlayerLocation(startX + 2.5D, startY + 1.0D, startZ + 0.5D, -90.0F, 0.0F);
++
++		// Spawn Nebilim172438 at far end (120 blocks away) facing player (-X direction / 90.0F yaw)
++		EntityNebilim172438 nebilim = new EntityNebilim172438(this.worldObj);
++		nebilim.setLocationAndAngles(startX + 120.0D, startY + 1.0D, startZ + 0.5D, 90.0F, 0.0F);
++		this.worldObj.spawnEntityInWorld(nebilim);
++		this.event16EntitySpawned = true;
++
++		// Freeze player input for 60 seconds (1200 ticks)
++		try {
++			java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++			java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++			out.writeByte(16);
++			out.writeInt(1200);
++			out.writeFloat(1.0F);
++			out.writeUTF("FreezeInput");
++			
++			Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++			if (playerSP.playerNetServerHandler != null) {
++				playerSP.playerNetServerHandler.sendPacketToPlayer(packet);
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	public void event17(EntityPlayerMP playerSP) {
++		double yawRad = Math.toRadians(playerSP.rotationYaw);
++		double spawnX = playerSP.posX - Math.sin(yawRad) * 92.0D;
++		double spawnZ = playerSP.posZ + Math.cos(yawRad) * 92.0D;
++		double spawnY = playerSP.posY;
++
++		int blockX = MathHelper.floor_double(spawnX);
++		int blockZ = MathHelper.floor_double(spawnZ);
++		int blockY = MathHelper.floor_double(spawnY);
++
++		for (int y = blockY; y < 250; y++) {
++			if (this.worldObj.isAirBlock(blockX, y, blockZ) && this.worldObj.isAirBlock(blockX, y + 1, blockZ)) {
++				spawnY = y;
++				break;
++			}
++		}
++
++		EntityScreen screen = new EntityScreen(this.worldObj);
++		screen.setLocationAndAngles(spawnX, spawnY, spawnZ, playerSP.rotationYaw, 0.0F);
++		this.worldObj.spawnEntityInWorld(screen);
++
++		String joinMsg = EnumChatFormatting.YELLOW + "Screen " + StringTranslate.getInstance().translateKeyFormat("multiplayer.player.joined", "Screen");
++		if (joinMsg.contains("multiplayer.player.joined")) {
++			joinMsg = EnumChatFormatting.YELLOW + "Screen joined the game.";
++		}
++		for (Object obj : this.worldObj.playerEntities) {
++			if (obj instanceof EntityPlayerMP) {
++				EntityPlayerMP p = (EntityPlayerMP) obj;
++				if (p.playerNetServerHandler != null) {
++					p.playerNetServerHandler.sendPacketToPlayer(new Packet3Chat(joinMsg));
++				}
++			}
++		}
++	}
++
++	public void event18(EntityPlayerMP playerSP) {
++		double yawRad = Math.toRadians(playerSP.rotationYaw);
++		double spawnX = playerSP.posX - Math.sin(yawRad) * 92.0D;
++		double spawnZ = playerSP.posZ + Math.cos(yawRad) * 92.0D;
++		double spawnY = playerSP.posY;
++
++		int blockX = MathHelper.floor_double(spawnX);
++		int blockZ = MathHelper.floor_double(spawnZ);
++		int blockY = MathHelper.floor_double(spawnY);
++
++		for (int y = blockY; y < 250; y++) {
++			if (this.worldObj.isAirBlock(blockX, y, blockZ) && this.worldObj.isAirBlock(blockX, y + 1, blockZ)) {
++				spawnY = y;
++				break;
++			}
++		}
++
++		EntityWlsu4pdrlu mob = new EntityWlsu4pdrlu(this.worldObj);
++		mob.setLocationAndAngles(spawnX, spawnY, spawnZ, playerSP.rotationYaw, 0.0F);
++		this.worldObj.spawnEntityInWorld(mob);
++
++		String joinMsg = EnumChatFormatting.YELLOW + "Wlsu4pdrlu " + StringTranslate.getInstance().translateKeyFormat("multiplayer.player.joined", "Wlsu4pdrlu");
++		if (joinMsg.contains("multiplayer.player.joined")) {
++			joinMsg = EnumChatFormatting.YELLOW + "Wlsu4pdrlu joined the game.";
++		}
++		for (Object obj : this.worldObj.playerEntities) {
++			if (obj instanceof EntityPlayerMP) {
++				EntityPlayerMP p = (EntityPlayerMP) obj;
++				if (p.playerNetServerHandler != null) {
++					p.playerNetServerHandler.sendPacketToPlayer(new Packet3Chat(joinMsg));
++				}
++			}
++		}
++	}
++
++	public void event19(EntityPlayerMP playerSP) {
++	}
++
++	public void event20(EntityPlayerMP playerSP) {
++	}
++
++	public void tickEvents() {
++		List<EntityPlayerMP> playerSPList = this.worldObj.playerEntities;
++		if (playerSPList.isEmpty()) {
++			if (this.event14Active) {
++				this.event14Active = false;
++				this.event14EntitySpawned = false;
++			}
++			if (this.event16Active) {
++				this.event16Active = false;
++				this.event16EntitySpawned = false;
++			}
++			return;
++		}
++
++		if(!playerSPList.isEmpty()) {
++			if (!this.event14Active && this.worldObj.getWorldTime() % 40 == 0) {
++				double[] restoreData = this.loadRestoreState();
++				if (restoreData != null) {
++					double origX = restoreData[0];
++					double origY = restoreData[1];
++					double origZ = restoreData[2];
++					int startX = (int)restoreData[3];
++					int startY = (int)restoreData[4];
++					int startZ = (int)restoreData[5];
++					int len = (int)restoreData[6];
++
++					this.event14TunnelStartX = startX;
++					this.event14TunnelStartY = startY;
++					this.event14TunnelStartZ = startZ;
++					this.clearBedrockTunnel();
++
++					for (EntityPlayerMP p : playerSPList) {
++						p.setPositionAndRotation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
++						if (p.playerNetServerHandler != null) {
++							p.playerNetServerHandler.setPlayerLocation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
++						}
++					}
++
++					this.clearRestoreState();
++					this.event14Active = false;
++					this.event14EntitySpawned = false;
++				}
++			}
++
++			if (!this.event16Active && this.worldObj.getWorldTime() % 40 == 0) {
++				double[] restoreData16 = this.loadRestoreState16();
++				if (restoreData16 != null) {
++					double origX = restoreData16[0];
++					double origY = restoreData16[1];
++					double origZ = restoreData16[2];
++					int startX = (int)restoreData16[3];
++					int startY = (int)restoreData16[4];
++					int startZ = (int)restoreData16[5];
++
++					this.event16StartX = startX;
++					this.event16StartY = startY;
++					this.event16StartZ = startZ;
++					this.clearBedrockRoom16();
++
++					for (EntityPlayerMP p : playerSPList) {
++						p.setPositionAndRotation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
++						if (p.playerNetServerHandler != null) {
++							p.playerNetServerHandler.setPlayerLocation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
++						}
++					}
++
++					this.clearRestoreState16();
++					this.event16Active = false;
++					this.event16EntitySpawned = false;
++				}
++			}
++
++			EntityPlayerMP playerSP = playerSPList.get(new Random().nextInt(playerSPList.size()));
++			switch(new Random().nextInt(20 * 60 * 45)) {
++			case 0:
++				this.event0(playerSP);
++				break;
++			case 1:
++				this.event1(playerSP);
++				break;
++			case 2:
++				this.event2(playerSP);
++				break;
++			case 3:
++				this.event3(playerSP);
++				break;
++			case 4:
++				this.event4(playerSP);
++				break;
++			case 5:
++				this.event5(playerSP);
++				break;
++			case 6:
++				this.event6(playerSP);
++				break;
++			case 7:
++				this.event7(playerSP);
++				break;
++			case 8:
++				this.event8(playerSP);
++				break;
++			case 9:
++				this.event9(playerSP);
++				break;
++			case 10:
++				this.event10(playerSP);
++				break;
++			case 11:
++				this.event11(playerSP);
++				break;
++			case 12:
++				this.event12(playerSP);
++				break;
++			case 13:
++				this.event13(playerSP);
++				break;
++			case 14:
++				if(this.worldObj.rand.nextInt(4) == 0) {
++					this.event14(playerSP);
++				}
++				break;
++			case 15:
++				this.event15(playerSP);
++				break;
++			case 16:
++				if(this.worldObj.rand.nextInt(3) == 0) {
++					this.event16(playerSP);
++				}
++				break;
++			case 17:
++				this.event17(playerSP);
++				break;
++			case 18:
++				this.event18(playerSP);
++				break;
++			case 19:
++				this.event19(playerSP);
++				break;
++			case 20:
++				this.event20(playerSP);
++				break;
++			}
++			if(this.timerS[0]) {
++				this.timer[0]++;
++				if(this.timer[0] >= 20 * 60 * 6) {
++					this.timerS[0] = false;
++					this.timer[0] = 0;
++				}
++			}
++			if(this.timerS[1]) {
++				this.timer[1]++;
++				if(this.timer[1] >= 20 * 8) {
++					this.timerS[1] = false;
++					this.timer[1] = 0;
++				}
++			}
++			if(this.timerS[2]) {
++				this.timer[2]++;
++				if(this.timer[2] >= 20 * 8) {
++					this.timerS[2] = false;
++					this.timer[2] = 0;
++				}
++			}
++			if(this.timerS[3]) {
++				this.timer[3]++;
++				if(this.timer[3] >= 20 * 8) {
++					this.timerS[3] = false;
++					this.timer[3] = 0;
++				}
++			}
++			if(this.timerS[4]) {
++				this.timer[4]++;
++				if(this.timer[4] >= 20 * 8) {
++					this.timerS[4] = false;
++					this.timer[4] = 0;
++				}
++			}
++			if(this.timerS[5]) {
++				this.timer[5]++;
++				if(this.timer[5] >= 20 * 8) {
++					this.timerS[5] = false;
++					this.timer[5] = 0;
++				}
++			}
++			if(this.timerS[6]) {
++				this.timer[6]++;
++				if(this.timer[6] >= 20 * 8) {
++					this.timerS[6] = false;
++					this.timer[6] = 0;
++				}
++			}
++			if(this.timerS[12]) {
++				this.timer[12]++;
++				if(this.timer[12] >= 20 * 6) {
++					this.timerS[12] = false;
++					this.timer[12] = 0;
++				}
++			}
++			if(this.timerS[13]) {
++				this.timer[13]++;
++				this.worldObj.setWorldTime(this.worldObj.getWorldTime() + new Random().nextInt(15000) - 7500);
++				if(this.timer[13] >= 20 * 6) {
++					this.timerS[13] = false;
++					this.timer[13] = 0;
++				}
++			}
++			if (this.event14Active && !this.event14EntitySpawned) {
++				for (EntityPlayerMP player : playerSPList) {
++					double dx = player.posX - this.event14TunnelStartX;
++					double dz = player.posZ - this.event14TunnelStartZ;
++					double dy = player.posY - this.event14TunnelStartY;
++					
++					if (dy > -5 && dy < 10 && dz >= -2 && dz <= 2 && dx >= 115) {
++						this.event14EntitySpawned = true;
++						
++						EntityLengthFix chaser = new EntityLengthFix(this.worldObj);
++						chaser.setLocationAndAngles(
++							this.event14TunnelStartX + 4.5D,
++							this.event14TunnelStartY + 1.0D,
++							this.event14TunnelStartZ + 0.5D,
++							-90.0F,
++							0.0F
++						);
++						this.worldObj.spawnEntityInWorld(chaser);
++						
++						try {
++							java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
++							java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
++							out.writeByte(14);
++							out.writeInt(120000);
++							out.writeFloat(1.0F);
++							out.writeUTF("SpawnChaser");
++							
++							Packet250CustomPayload packet = new Packet250CustomPayload("CreepyEvent", bytes.toByteArray());
++							if (player.playerNetServerHandler != null) {
++								player.playerNetServerHandler.sendPacketToPlayer(packet);
++							}
++						} catch (Exception e) {
++							e.printStackTrace();
++						}
++						break;
++					}
++				}
++			}
++
++			if (this.event14Active && this.worldObj.getWorldTime() % 40 == 0) {
++				boolean anyPlayerInTunnel = false;
++				for (EntityPlayerMP player : playerSPList) {
++					double dx = player.posX - this.event14TunnelStartX;
++					double dz = player.posZ - this.event14TunnelStartZ;
++					double dy = player.posY - this.event14TunnelStartY;
++					if (dy > -5 && dy < 12 && dz >= -4 && dz <= 4 && dx >= -1 && dx <= 130) {
++						anyPlayerInTunnel = true;
++						break;
++					}
++				}
++				if (!anyPlayerInTunnel) {
++					this.clearBedrockTunnel();
++					this.clearRestoreState();
++					this.event14Active = false;
++					this.event14EntitySpawned = false;
++				}
++			}
++
++			if (this.event16Active && this.worldObj.getWorldTime() % 40 == 0) {
++				boolean anyPlayerInRoom = false;
++				for (EntityPlayerMP player : playerSPList) {
++					double dx = player.posX - this.event16StartX;
++					double dz = player.posZ - this.event16StartZ;
++					double dy = player.posY - this.event16StartY;
++					if (dy > -5 && dy < 12 && dz >= -2 && dz <= 18 && dx >= -2 && dx <= 18) {
++						anyPlayerInRoom = true;
++						break;
++					}
++				}
++				if (!anyPlayerInRoom) {
++					this.clearBedrockRoom16();
++					this.clearRestoreState16();
++					this.event16Active = false;
++					this.event16EntitySpawned = false;
++				}
++			}
++		}
++	}
++
++	private void saveRestoreState(double origX, double origY, double origZ, int startX, int startY, int startZ, int len) {
++		try {
++			java.io.File file = this.worldObj.getSaveHandler().getMapFileFromName("event14_restore.dat");
++			java.io.FileOutputStream fos = new java.io.FileOutputStream(file);
++			java.io.DataOutputStream dos = new java.io.DataOutputStream(fos);
++			dos.writeDouble(origX);
++			dos.writeDouble(origY);
++			dos.writeDouble(origZ);
++			dos.writeInt(startX);
++			dos.writeInt(startY);
++			dos.writeInt(startZ);
++			dos.writeInt(len);
++			dos.close();
++			fos.close();
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	private double[] loadRestoreState() {
++		try {
++			java.io.File file = this.worldObj.getSaveHandler().getMapFileFromName("event14_restore.dat");
++			if (file.exists()) {
++				java.io.FileInputStream fis = new java.io.FileInputStream(file);
++				java.io.DataInputStream dis = new java.io.DataInputStream(fis);
++				double origX = dis.readDouble();
++				double origY = dis.readDouble();
++				double origZ = dis.readDouble();
++				int startX = dis.readInt();
++				int startY = dis.readInt();
++				int startZ = dis.readInt();
++				int len = dis.readInt();
++				dis.close();
++				fis.close();
++				return new double[]{origX, origY, origZ, startX, startY, startZ, len};
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++		return null;
++	}
++
++	private void clearRestoreState() {
++		try {
++			java.io.File file = this.worldObj.getSaveHandler().getMapFileFromName("event14_restore.dat");
++			if (file.exists()) {
++				file.delete();
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	private void clearBedrockTunnel() {
++		int len = 128;
++		int startX = this.event14TunnelStartX;
++		int startY = this.event14TunnelStartY;
++		int startZ = this.event14TunnelStartZ;
++		for (int x = 0; x < len; x++) {
++			for (int y = 0; y < 10; y++) {
++				for (int z = -3; z <= 3; z++) {
++					int blockId = this.worldObj.getBlockId(startX + x, startY + y, startZ + z);
++					if (blockId == Block.bedrock.blockID || blockId == Block.glowStone.blockID) {
++						this.worldObj.setBlock(startX + x, startY + y, startZ + z, 0);
++					}
++				}
++			}
++		}
++	}
++
++	private void saveRestoreState16(double origX, double origY, double origZ, int startX, int startY, int startZ) {
++		try {
++			java.io.File file = this.worldObj.getSaveHandler().getMapFileFromName("event16_restore.dat");
++			java.io.FileOutputStream fos = new java.io.FileOutputStream(file);
++			java.io.DataOutputStream dos = new java.io.DataOutputStream(fos);
++			dos.writeDouble(origX);
++			dos.writeDouble(origY);
++			dos.writeDouble(origZ);
++			dos.writeInt(startX);
++			dos.writeInt(startY);
++			dos.writeInt(startZ);
++			dos.close();
++			fos.close();
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	private double[] loadRestoreState16() {
++		try {
++			java.io.File file = this.worldObj.getSaveHandler().getMapFileFromName("event16_restore.dat");
++			if (file.exists()) {
++				java.io.FileInputStream fis = new java.io.FileInputStream(file);
++				java.io.DataInputStream dis = new java.io.DataInputStream(fis);
++				double origX = dis.readDouble();
++				double origY = dis.readDouble();
++				double origZ = dis.readDouble();
++				int startX = dis.readInt();
++				int startY = dis.readInt();
++				int startZ = dis.readInt();
++				dis.close();
++				fis.close();
++				return new double[]{origX, origY, origZ, startX, startY, startZ};
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++		return null;
++	}
++
++	private void clearRestoreState16() {
++		try {
++			java.io.File file = this.worldObj.getSaveHandler().getMapFileFromName("event16_restore.dat");
++			if (file.exists()) {
++				file.delete();
++			}
++		} catch (Exception e) {
++			e.printStackTrace();
++		}
++	}
++
++	private void clearBedrockRoom16() {
++		int size = 16;
++		int startX = this.event16StartX;
++		int startY = this.event16StartY;
++		int startZ = this.event16StartZ;
++		for (int x = 0; x < size; x++) {
++			for (int y = 0; y < 10; y++) {
++				for (int z = 0; z < size; z++) {
++					int blockId = this.worldObj.getBlockId(startX + x, startY + y, startZ + z);
++					if (blockId == Block.bedrock.blockID || blockId == Block.glowStone.blockID) {
++						this.worldObj.setBlock(startX + x, startY + y, startZ + z, 0);
++					}
++				}
++			}
++		}
++	}
++}
+--- net/minecraft/src/CryptManager.java
++++ net/minecraft/src/CryptManager.java
+@@ -141,6 +141,9 @@
+ 	}
+ 
+ 	static {
+-		Security.addProvider(new BouncyCastleProvider());
++		try {
++			Security.addProvider((java.security.Provider) Class.forName("org.bouncycastle.jce.provider.BouncyCastleProvider").newInstance());
++		} catch (Throwable t) {
++		}
+ 	}
+ }
+--- /dev/null
++++ net/minecraft/src/Entity____.java
+@@ -1,0 +1,53 @@
++package net.minecraft.src;
++
++public class Entity____ extends Entity371 {
++    public Entity____(World var1) {
++        super(var1);
++        this.moveSpeed = 1.0F;
++    }
++
++    @Override
++    public void onUpdate() {
++        super.onUpdate();
++
++        EntityPlayer player = this.worldObj.getClosestPlayerToEntity(this, 128.0D);
++        if (player != null) {
++            this.entityToAttack = player;
++            this.faceEntity(player, 360.0F, 360.0F);
++
++            double dist = this.getDistanceToEntity(player);
++            if (dist <= 6.0D) {
++                this.setDead();
++            }
++        }
++    }
++
++    @Override
++    public boolean attackEntityFrom(DamageSource var1, int var2) {
++        return false;
++    }
++
++    @Override
++    public boolean isInvisible() {
++        return false;
++    }
++    public String getTexture() {
++        return "/addmob/____.png";
++    }
++
++    // NBTへの保存を無効化（ワールド再ロード時に残留しないように）
++    @Override
++    public boolean addEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public boolean addNotRiddenEntityID(NBTTagCompound var1) {
++        return false;
++    }
++
++    @Override
++    public int getMaxHealth() {
++        return 371;
++    }
++}
+--- net/minecraft/src/BlockCactus.java
++++ net/minecraft/src/BlockCactus.java
+@@ -3,6 +3,9 @@
+ import java.util.Random;
+ 
+ public class BlockCactus extends Block {
++	private Icon cactusTopIcon;
++	private Icon cactusBottomIcon;
++
+ 	protected BlockCactus(int var1) {
+ 		super(var1, Material.cactus);
+ 		this.setTickRandomly(true);
+@@ -34,6 +37,15 @@
+ 		return AxisAlignedBB.getAABBPool().getAABB((double)((float)var2 + var5), (double)var3, (double)((float)var4 + var5), (double)((float)(var2 + 1) - var5), (double)((float)(var3 + 1) - var5), (double)((float)(var4 + 1) - var5));
+ 	}
+ 
++	public AxisAlignedBB getSelectedBoundingBoxFromPool(World var1, int var2, int var3, int var4) {
++		float var5 = 1.0F / 16.0F;
++		return AxisAlignedBB.getAABBPool().getAABB((double)((float)var2 + var5), (double)var3, (double)((float)var4 + var5), (double)((float)(var2 + 1) - var5), (double)(var3 + 1), (double)((float)(var4 + 1) - var5));
++	}
++
++	public Icon getIcon(int var1, int var2) {
++		return var1 == 1 ? this.cactusTopIcon : (var1 == 0 ? this.cactusBottomIcon : this.blockIcon);
++	}
++
+ 	public boolean renderAsNormalBlock() {
+ 		return false;
+ 	}
+@@ -47,7 +59,7 @@
+ 	}
+ 
+ 	public boolean canPlaceBlockAt(World var1, int var2, int var3, int var4) {
+-		return !super.canPlaceBlockAt(var1, var2, var3, var4) ? false : this.canBlockStay(var1, var2, var3, var4);
++		return true;
+ 	}
+ 
+ 	public void onNeighborBlockChange(World var1, int var2, int var3, int var4, int var5) {
+@@ -58,18 +70,7 @@
+ 	}
+ 
+ 	public boolean canBlockStay(World var1, int var2, int var3, int var4) {
+-		if(var1.getBlockMaterial(var2 - 1, var3, var4).isSolid()) {
+-			return false;
+-		} else if(var1.getBlockMaterial(var2 + 1, var3, var4).isSolid()) {
+-			return false;
+-		} else if(var1.getBlockMaterial(var2, var3, var4 - 1).isSolid()) {
+-			return false;
+-		} else if(var1.getBlockMaterial(var2, var3, var4 + 1).isSolid()) {
+-			return false;
+-		} else {
+-			int var5 = var1.getBlockId(var2, var3 - 1, var4);
+-			return var5 == Block.cactus.blockID || var5 == Block.sand.blockID;
+-		}
++		return true;
+ 	}
+ 
+ 	public void onEntityCollidedWithBlock(World var1, int var2, int var3, int var4, Entity var5) {
