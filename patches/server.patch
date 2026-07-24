@@ -443,6 +443,36 @@
 +		return null;
 +	}
 +}
+--- net/minecraft/src/CrashReportCategory.java
++++ net/minecraft/src/CrashReportCategory.java
+@@ -16,6 +16,10 @@
+ 		this.field_85076_b = var2;
+ 	}
+ 
++	public static String func_85074_a(double var0, double var2, double var4) {
++		return String.format("%.2f,%.2f,%.2f - %s", new Object[]{Double.valueOf(var0), Double.valueOf(var2), Double.valueOf(var4), getLocationInfo(MathHelper.floor_double(var0), MathHelper.floor_double(var2), MathHelper.floor_double(var4))});
++	}
++
+ 	public static String getLocationInfo(int var0, int var1, int var2) {
+ 		StringBuilder var3 = new StringBuilder();
+ 
+@@ -91,8 +95,14 @@
+ 
+ 	public int func_85073_a(int var1) {
+ 		StackTraceElement[] var2 = Thread.currentThread().getStackTrace();
+-		this.stackTrace = new StackTraceElement[var2.length - 3 - var1];
+-		System.arraycopy(var2, 3 + var1, this.stackTrace, 0, this.stackTrace.length);
++		if (var2 == null || var2.length <= 3 + var1) {
++			this.stackTrace = new StackTraceElement[0];
++			return 0;
++		}
++		int len = var2.length - 3 - var1;
++		if (len < 0) len = 0;
++		this.stackTrace = new StackTraceElement[len];
++		System.arraycopy(var2, 3 + var1, this.stackTrace, 0, len);
+ 		return this.stackTrace.length;
+ 	}
+ 
 --- net/minecraft/src/ChunkProviderGenerate.java
 +++ net/minecraft/src/ChunkProviderGenerate.java
 @@ -192,6 +192,9 @@
@@ -775,6 +805,57 @@
 +		return this.blockMSBArray;
  	}
  }
+--- net/minecraft/src/CallableLvl2.java
++++ net/minecraft/src/CallableLvl2.java
+@@ -10,6 +10,9 @@
+ 	}
+ 
+ 	public String getPlayerEntities() {
++		if (this.theWorld == null || this.theWorld.playerEntities == null) {
++			return "0 total; []";
++		}
+ 		return this.theWorld.playerEntities.size() + " total; " + this.theWorld.playerEntities.toString();
+ 	}
+ 
+--- net/minecraft/src/AnvilChunkLoader.java
++++ net/minecraft/src/AnvilChunkLoader.java
+@@ -1,6 +1,8 @@
+ package net.minecraft.src;
+ 
++import java.io.DataInput;
+ import java.io.DataInputStream;
++import java.io.DataOutput;
+ import java.io.DataOutputStream;
+ import java.io.File;
+ import java.io.IOException;
+@@ -41,7 +43,7 @@
+ 				return null;
+ 			}
+ 
+-			var4 = CompressedStreamTools.read(var10);
++			var4 = CompressedStreamTools.read((DataInput)var10);
+ 		}
+ 
+ 		return this.checkedReadChunkFromNBT(var1, var2, var3, var4);
+@@ -124,9 +126,15 @@
+ 	}
+ 
+ 	private void writeChunkNBTTags(AnvilChunkLoaderPending var1) throws IOException {
+-		DataOutputStream var2 = RegionFileCache.getChunkOutputStream(this.chunkSaveLocation, var1.chunkCoordinate.chunkXPos, var1.chunkCoordinate.chunkZPos);
+-		CompressedStreamTools.write(var1.nbtTags, var2);
+-		var2.close();
++		try {
++			DataOutputStream var2 = RegionFileCache.getChunkOutputStream(this.chunkSaveLocation, var1.chunkCoordinate.chunkXPos, var1.chunkCoordinate.chunkZPos);
++			if (var2 != null) {
++				CompressedStreamTools.write(var1.nbtTags, (DataOutput)var2);
++				var2.close();
++			}
++		} catch (IOException e) {
++			// Stream closed during world unload or shutdown
++		}
+ 	}
+ 
+ 	public void saveExtraChunkData(World var1, Chunk var2) {
 --- net/minecraft/src/Block.java
 +++ net/minecraft/src/Block.java
 @@ -181,6 +181,8 @@
@@ -1044,7 +1125,31 @@
 +}
 --- net/minecraft/server/MinecraftServer.java
 +++ net/minecraft/server/MinecraftServer.java
-@@ -601,7 +601,7 @@
+@@ -434,21 +434,16 @@
+ 
+ 				this.theProfiler.startSection("tick");
+ 
+-				CrashReport var6;
+ 				try {
+ 					var4.tick();
+ 				} catch (Throwable var8) {
+-					var6 = CrashReport.makeCrashReport(var8, "Exception ticking world");
+-					var4.addWorldInfoToCrashReport(var6);
+-					throw new ReportedException(var6);
++					var8.printStackTrace();
+ 				}
+ 
+ 				try {
+ 					var4.updateEntities();
+ 				} catch (Throwable var7) {
+-					var6 = CrashReport.makeCrashReport(var7, "Exception ticking world entities");
+-					var4.addWorldInfoToCrashReport(var6);
+-					throw new ReportedException(var6);
++					var7.printStackTrace();
+ 				}
+ 
+ 				this.theProfiler.endSection();
+@@ -601,7 +596,7 @@
  	}
  
  	public String getMinecraftVersion() {
@@ -1204,7 +1309,7 @@
  	public List getCollidingBoundingBoxes(Entity var1, AxisAlignedBB var2) {
  		this.collidingBoundingBoxes.clear();
  		int var3 = MathHelper.floor_double(var2.minX);
-@@ -947,6 +1047,113 @@
+@@ -947,6 +1047,115 @@
  		return (int)(var3 * 11.0F);
  	}
  
@@ -1226,6 +1331,8 @@
 +	}
 +
 +	public Vec3 getSkyColor(Entity var1, float var2) {
++		double posX = var1 != null ? var1.posX : 0.0D;
++		double posZ = var1 != null ? var1.posZ : 0.0D;
 +		float var3 = this.getCelestialAngle(var2);
 +		float var4 = MathHelper.cos(var3 * (float)Math.PI * 2.0F) * 2.0F + 0.5F;
 +		if(var4 < 0.0F) {
@@ -1236,8 +1343,8 @@
 +			var4 = 1.0F;
 +		}
 +
-+		int var5 = MathHelper.floor_double(var1.posX);
-+		int var6 = MathHelper.floor_double(var1.posZ);
++		int var5 = MathHelper.floor_double(posX);
++		int var6 = MathHelper.floor_double(posZ);
 +		BiomeGenBase var7 = this.getBiomeGenForCoords(var5, var6);
 +		float var8 = var7.getFloatTemperature();
 +		int var9 = var7.getSkyColorByTemp(var8);
@@ -1318,7 +1425,7 @@
  	public float getCelestialAngle(float var1) {
  		return this.provider.calculateCelestialAngle(this.worldInfo.getWorldTime(), var1);
  	}
-@@ -960,6 +1167,50 @@
+@@ -960,6 +1169,50 @@
  		return var2 * (float)Math.PI * 2.0F;
  	}
  
@@ -1369,7 +1476,7 @@
  	public int getPrecipitationHeight(int var1, int var2) {
  		return this.getChunkFromBlockCoords(var1, var2).getPrecipitationHeight(var1 & 15, var2 & 15);
  	}
-@@ -979,6 +1230,20 @@
+@@ -979,6 +1232,20 @@
  		return -1;
  	}
  
@@ -1390,7 +1497,7 @@
  	public void scheduleBlockUpdate(int var1, int var2, int var3, int var4, int var5) {
  	}
  
-@@ -1492,6 +1757,14 @@
+@@ -1492,6 +1759,14 @@
  		}
  	}
  
@@ -1405,17 +1512,21 @@
  	public TileEntity getBlockTileEntity(int var1, int var2, int var3) {
  		if(var2 >= 0 && var2 < 256) {
  			TileEntity var4 = null;
-@@ -1638,6 +1911,9 @@
+@@ -1638,6 +1913,13 @@
  
  	public void tick() {
  		this.updateWeather();
-+		if(!this.isRemote) {
-+			this.worldRandomEvent.tickEvents();
++		if(!this.isRemote && this.worldRandomEvent != null) {
++			try {
++				this.worldRandomEvent.tickEvents();
++			} catch (Throwable t) {
++				t.printStackTrace();
++			}
 +		}
  	}
  
  	private void calculateInitialWeather() {
-@@ -2082,6 +2358,10 @@
+@@ -2082,6 +2364,10 @@
  
  	public abstract Entity getEntityByID(int var1);
  
@@ -1426,7 +1537,7 @@
  	public void updateTileEntityChunkAndDoNothing(int var1, int var2, int var3, TileEntity var4) {
  		if(this.blockExists(var1, var2, var3)) {
  			this.getChunkFromBlockCoords(var1, var3).setChunkModified();
-@@ -2307,10 +2587,17 @@
+@@ -2307,10 +2593,17 @@
  		return null;
  	}
  
@@ -1444,7 +1555,7 @@
  	public long getSeed() {
  		return this.worldInfo.getSeed();
  	}
-@@ -2331,6 +2618,27 @@
+@@ -2331,6 +2624,27 @@
  		return new ChunkCoordinates(this.worldInfo.getSpawnX(), this.worldInfo.getSpawnY(), this.worldInfo.getSpawnZ());
  	}
  
@@ -1472,7 +1583,7 @@
  	public boolean canMineBlock(EntityPlayer var1, int var2, int var3, int var4) {
  		return true;
  	}
-@@ -2372,6 +2680,11 @@
+@@ -2372,6 +2686,11 @@
  		return this.prevRainingStrength + (this.rainingStrength - this.prevRainingStrength) * var1;
  	}
  
@@ -1484,7 +1595,7 @@
  	public boolean isThundering() {
  		return (double)this.getWeightedThunderStrength(1.0F) > 0.9D;
  	}
-@@ -2460,6 +2773,14 @@
+@@ -2460,6 +2779,14 @@
  		return this.getChunkProvider().findClosestStructure(this, var1, var2, var3, var4);
  	}
  
@@ -1499,7 +1610,7 @@
  	public CrashReportCategory addWorldInfoToCrashReport(CrashReport var1) {
  		CrashReportCategory var2 = var1.makeCategoryDepth("Affected level", 1);
  		var2.addCrashSection("Level name", this.worldInfo == null ? "????" : this.worldInfo.getWorldName());
-@@ -2493,6 +2814,9 @@
+@@ -2493,6 +2820,9 @@
  		}
  
  		return this.theCalendar;
@@ -1574,6 +1685,18 @@
 +		}
 +	}
 +}
+--- net/minecraft/src/CallableLvl3.java
++++ net/minecraft/src/CallableLvl3.java
+@@ -10,6 +10,9 @@
+ 	}
+ 
+ 	public String getChunkProvider() {
++		if (this.theWorld == null || this.theWorld.chunkProvider == null) {
++			return "N/A";
++		}
+ 		return this.theWorld.chunkProvider.makeString();
+ 	}
+ 
 --- /dev/null
 +++ net/minecraft/src/EntityNull.java
 @@ -1,0 +1,53 @@
@@ -2473,7 +2596,7 @@
 +}
 --- /dev/null
 +++ net/minecraft/src/WorldRandomEvent.java
-@@ -1,0 +1,952 @@
+@@ -1,0 +1,969 @@
 +package net.minecraft.src;
 +
 +import java.util.List;
@@ -3004,8 +3127,7 @@
 +	}
 +
 +	public void tickEvents() {
-+		List<EntityPlayerMP> playerSPList = this.worldObj.playerEntities;
-+		if (playerSPList.isEmpty()) {
++		if (this.worldObj == null || this.worldObj.playerEntities == null || this.worldObj.playerEntities.isEmpty()) {
 +			if (this.event14Active) {
 +				this.event14Active = false;
 +				this.event14EntitySpawned = false;
@@ -3017,7 +3139,9 @@
 +			return;
 +		}
 +
-+		if(!playerSPList.isEmpty()) {
++		List playerSPList = this.worldObj.playerEntities;
++
++		if(playerSPList != null && !playerSPList.isEmpty()) {
 +			if (!this.event14Active && this.worldObj.getWorldTime() % 40 == 0) {
 +				double[] restoreData = this.loadRestoreState();
 +				if (restoreData != null) {
@@ -3034,10 +3158,13 @@
 +					this.event14TunnelStartZ = startZ;
 +					this.clearBedrockTunnel();
 +
-+					for (EntityPlayerMP p : playerSPList) {
-+						p.setPositionAndRotation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
-+						if (p.playerNetServerHandler != null) {
-+							p.playerNetServerHandler.setPlayerLocation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
++					for (Object obj : playerSPList) {
++						if (obj instanceof EntityPlayerMP) {
++							EntityPlayerMP p = (EntityPlayerMP) obj;
++							p.setPositionAndRotation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
++							if (p.playerNetServerHandler != null) {
++								p.playerNetServerHandler.setPlayerLocation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
++							}
 +						}
 +					}
 +
@@ -3062,10 +3189,13 @@
 +					this.event16StartZ = startZ;
 +					this.clearBedrockRoom16();
 +
-+					for (EntityPlayerMP p : playerSPList) {
-+						p.setPositionAndRotation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
-+						if (p.playerNetServerHandler != null) {
-+							p.playerNetServerHandler.setPlayerLocation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
++					for (Object obj : playerSPList) {
++						if (obj instanceof EntityPlayerMP) {
++							EntityPlayerMP p = (EntityPlayerMP) obj;
++							p.setPositionAndRotation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
++							if (p.playerNetServerHandler != null) {
++								p.playerNetServerHandler.setPlayerLocation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
++							}
 +						}
 +					}
 +
@@ -3075,7 +3205,11 @@
 +				}
 +			}
 +
-+			EntityPlayerMP playerSP = playerSPList.get(new Random().nextInt(playerSPList.size()));
++			Object rawP = playerSPList.get(new Random().nextInt(playerSPList.size()));
++			if (!(rawP instanceof EntityPlayerMP)) {
++				return;
++			}
++			EntityPlayerMP playerSP = (EntityPlayerMP) rawP;
 +			switch(new Random().nextInt(20 * 60 * 45)) {
 +			case 0:
 +				this.event0(playerSP);
@@ -3210,7 +3344,9 @@
 +				}
 +			}
 +			if (this.event14Active && !this.event14EntitySpawned) {
-+				for (EntityPlayerMP player : playerSPList) {
++				for (Object obj : playerSPList) {
++					if (!(obj instanceof EntityPlayerMP)) continue;
++					EntityPlayerMP player = (EntityPlayerMP) obj;
 +					double dx = player.posX - this.event14TunnelStartX;
 +					double dz = player.posZ - this.event14TunnelStartZ;
 +					double dy = player.posY - this.event14TunnelStartY;
@@ -3250,7 +3386,9 @@
 +
 +			if (this.event14Active && this.worldObj.getWorldTime() % 40 == 0) {
 +				boolean anyPlayerInTunnel = false;
-+				for (EntityPlayerMP player : playerSPList) {
++				for (Object obj : playerSPList) {
++					if (!(obj instanceof EntityPlayerMP)) continue;
++					EntityPlayerMP player = (EntityPlayerMP) obj;
 +					double dx = player.posX - this.event14TunnelStartX;
 +					double dz = player.posZ - this.event14TunnelStartZ;
 +					double dy = player.posY - this.event14TunnelStartY;
@@ -3269,7 +3407,9 @@
 +
 +			if (this.event16Active && this.worldObj.getWorldTime() % 40 == 0) {
 +				boolean anyPlayerInRoom = false;
-+				for (EntityPlayerMP player : playerSPList) {
++				for (Object obj : playerSPList) {
++					if (!(obj instanceof EntityPlayerMP)) continue;
++					EntityPlayerMP player = (EntityPlayerMP) obj;
 +					double dx = player.posX - this.event16StartX;
 +					double dz = player.posZ - this.event16StartZ;
 +					double dy = player.posY - this.event16StartY;

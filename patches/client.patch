@@ -1758,6 +1758,25 @@
 +		return null;
 +	}
 +}
+--- net/minecraft/src/CrashReportCategory.java
++++ net/minecraft/src/CrashReportCategory.java
+@@ -95,8 +95,14 @@
+ 
+ 	public int func_85073_a(int var1) {
+ 		StackTraceElement[] var2 = Thread.currentThread().getStackTrace();
+-		this.stackTrace = new StackTraceElement[var2.length - 3 - var1];
+-		System.arraycopy(var2, 3 + var1, this.stackTrace, 0, this.stackTrace.length);
++		if (var2 == null || var2.length <= 3 + var1) {
++			this.stackTrace = new StackTraceElement[0];
++			return 0;
++		}
++		int len = var2.length - 3 - var1;
++		if (len < 0) len = 0;
++		this.stackTrace = new StackTraceElement[len];
++		System.arraycopy(var2, 3 + var1, this.stackTrace, 0, len);
+ 		return this.stackTrace.length;
+ 	}
+ 
 --- net/minecraft/src/ChunkProviderGenerate.java
 +++ net/minecraft/src/ChunkProviderGenerate.java
 @@ -192,6 +192,9 @@
@@ -3842,6 +3861,39 @@
 +		GL11.glPopAttrib();
 +	}
 +}
+--- net/minecraft/src/CallableLvl2.java
++++ net/minecraft/src/CallableLvl2.java
+@@ -10,6 +10,9 @@
+ 	}
+ 
+ 	public String getPlayerEntities() {
++		if (this.theWorld == null || this.theWorld.playerEntities == null) {
++			return "0 total; []";
++		}
+ 		return this.theWorld.playerEntities.size() + " total; " + this.theWorld.playerEntities.toString();
+ 	}
+ 
+--- net/minecraft/src/AnvilChunkLoader.java
++++ net/minecraft/src/AnvilChunkLoader.java
+@@ -126,9 +126,15 @@
+ 	}
+ 
+ 	private void writeChunkNBTTags(AnvilChunkLoaderPending var1) throws IOException {
+-		DataOutputStream var2 = RegionFileCache.getChunkOutputStream(this.chunkSaveLocation, var1.chunkCoordinate.chunkXPos, var1.chunkCoordinate.chunkZPos);
+-		CompressedStreamTools.write(var1.nbtTags, (DataOutput)var2);
+-		var2.close();
++		try {
++			DataOutputStream var2 = RegionFileCache.getChunkOutputStream(this.chunkSaveLocation, var1.chunkCoordinate.chunkXPos, var1.chunkCoordinate.chunkZPos);
++			if (var2 != null) {
++				CompressedStreamTools.write(var1.nbtTags, (DataOutput)var2);
++				var2.close();
++			}
++		} catch (IOException e) {
++			// Stream closed during world unload or shutdown
++		}
+ 	}
+ 
+ 	public void saveExtraChunkData(World var1, Chunk var2) {
 --- net/minecraft/src/Block.java
 +++ net/minecraft/src/Block.java
 @@ -181,6 +181,8 @@
@@ -4193,7 +4245,27 @@
  	}
  
  	protected abstract IChunkProvider createChunkProvider();
-@@ -1115,6 +1118,39 @@
+@@ -1062,6 +1065,8 @@
+ 	}
+ 
+ 	public Vec3 getSkyColor(Entity var1, float var2) {
++		double posX = var1 != null ? var1.posX : 0.0D;
++		double posZ = var1 != null ? var1.posZ : 0.0D;
+ 		float var3 = this.getCelestialAngle(var2);
+ 		float var4 = MathHelper.cos(var3 * (float)Math.PI * 2.0F) * 2.0F + 0.5F;
+ 		if(var4 < 0.0F) {
+@@ -1072,8 +1077,8 @@
+ 			var4 = 1.0F;
+ 		}
+ 
+-		int var5 = MathHelper.floor_double(var1.posX);
+-		int var6 = MathHelper.floor_double(var1.posZ);
++		int var5 = MathHelper.floor_double(posX);
++		int var6 = MathHelper.floor_double(posZ);
+ 		BiomeGenBase var7 = this.getBiomeGenForCoords(var5, var6);
+ 		float var8 = var7.getFloatTemperature();
+ 		int var9 = var7.getSkyColorByTemp(var8);
+@@ -1115,6 +1120,39 @@
  			var12 = var12 * (1.0F - var15) + 1.0F * var15;
  		}
  
@@ -4233,12 +4305,16 @@
  		return this.getWorldVec3Pool().getVecFromPool((double)var10, (double)var11, (double)var12);
  	}
  
-@@ -1876,6 +1912,9 @@
+@@ -1876,6 +1914,13 @@
  
  	public void tick() {
  		this.updateWeather();
-+		if(!this.isRemote) {
-+			this.worldRandomEvent.tickEvents();
++		if(!this.isRemote && this.worldRandomEvent != null) {
++			try {
++				this.worldRandomEvent.tickEvents();
++			} catch (Throwable t) {
++				t.printStackTrace();
++			}
 +		}
  	}
  
@@ -4415,6 +4491,18 @@
 +		}
 +	}
 +}
+--- net/minecraft/src/CallableLvl3.java
++++ net/minecraft/src/CallableLvl3.java
+@@ -10,6 +10,9 @@
+ 	}
+ 
+ 	public String getChunkProvider() {
++		if (this.theWorld == null || this.theWorld.chunkProvider == null) {
++			return "N/A";
++		}
+ 		return this.theWorld.chunkProvider.makeString();
+ 	}
+ 
 --- /dev/null
 +++ net/minecraft/src/EntityNull.java
 @@ -1,0 +1,55 @@
@@ -5670,7 +5758,7 @@
 +}
 --- /dev/null
 +++ net/minecraft/src/WorldRandomEvent.java
-@@ -1,0 +1,952 @@
+@@ -1,0 +1,969 @@
 +package net.minecraft.src;
 +
 +import java.util.List;
@@ -6201,8 +6289,7 @@
 +	}
 +
 +	public void tickEvents() {
-+		List<EntityPlayerMP> playerSPList = this.worldObj.playerEntities;
-+		if (playerSPList.isEmpty()) {
++		if (this.worldObj == null || this.worldObj.playerEntities == null || this.worldObj.playerEntities.isEmpty()) {
 +			if (this.event14Active) {
 +				this.event14Active = false;
 +				this.event14EntitySpawned = false;
@@ -6214,7 +6301,9 @@
 +			return;
 +		}
 +
-+		if(!playerSPList.isEmpty()) {
++		List playerSPList = this.worldObj.playerEntities;
++
++		if(playerSPList != null && !playerSPList.isEmpty()) {
 +			if (!this.event14Active && this.worldObj.getWorldTime() % 40 == 0) {
 +				double[] restoreData = this.loadRestoreState();
 +				if (restoreData != null) {
@@ -6231,10 +6320,13 @@
 +					this.event14TunnelStartZ = startZ;
 +					this.clearBedrockTunnel();
 +
-+					for (EntityPlayerMP p : playerSPList) {
-+						p.setPositionAndRotation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
-+						if (p.playerNetServerHandler != null) {
-+							p.playerNetServerHandler.setPlayerLocation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
++					for (Object obj : playerSPList) {
++						if (obj instanceof EntityPlayerMP) {
++							EntityPlayerMP p = (EntityPlayerMP) obj;
++							p.setPositionAndRotation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
++							if (p.playerNetServerHandler != null) {
++								p.playerNetServerHandler.setPlayerLocation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
++							}
 +						}
 +					}
 +
@@ -6259,10 +6351,13 @@
 +					this.event16StartZ = startZ;
 +					this.clearBedrockRoom16();
 +
-+					for (EntityPlayerMP p : playerSPList) {
-+						p.setPositionAndRotation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
-+						if (p.playerNetServerHandler != null) {
-+							p.playerNetServerHandler.setPlayerLocation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
++					for (Object obj : playerSPList) {
++						if (obj instanceof EntityPlayerMP) {
++							EntityPlayerMP p = (EntityPlayerMP) obj;
++							p.setPositionAndRotation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
++							if (p.playerNetServerHandler != null) {
++								p.playerNetServerHandler.setPlayerLocation(origX, origY, origZ, p.rotationYaw, p.rotationPitch);
++							}
 +						}
 +					}
 +
@@ -6272,7 +6367,11 @@
 +				}
 +			}
 +
-+			EntityPlayerMP playerSP = playerSPList.get(new Random().nextInt(playerSPList.size()));
++			Object rawP = playerSPList.get(new Random().nextInt(playerSPList.size()));
++			if (!(rawP instanceof EntityPlayerMP)) {
++				return;
++			}
++			EntityPlayerMP playerSP = (EntityPlayerMP) rawP;
 +			switch(new Random().nextInt(20 * 60 * 45)) {
 +			case 0:
 +				this.event0(playerSP);
@@ -6407,7 +6506,9 @@
 +				}
 +			}
 +			if (this.event14Active && !this.event14EntitySpawned) {
-+				for (EntityPlayerMP player : playerSPList) {
++				for (Object obj : playerSPList) {
++					if (!(obj instanceof EntityPlayerMP)) continue;
++					EntityPlayerMP player = (EntityPlayerMP) obj;
 +					double dx = player.posX - this.event14TunnelStartX;
 +					double dz = player.posZ - this.event14TunnelStartZ;
 +					double dy = player.posY - this.event14TunnelStartY;
@@ -6447,7 +6548,9 @@
 +
 +			if (this.event14Active && this.worldObj.getWorldTime() % 40 == 0) {
 +				boolean anyPlayerInTunnel = false;
-+				for (EntityPlayerMP player : playerSPList) {
++				for (Object obj : playerSPList) {
++					if (!(obj instanceof EntityPlayerMP)) continue;
++					EntityPlayerMP player = (EntityPlayerMP) obj;
 +					double dx = player.posX - this.event14TunnelStartX;
 +					double dz = player.posZ - this.event14TunnelStartZ;
 +					double dy = player.posY - this.event14TunnelStartY;
@@ -6466,7 +6569,9 @@
 +
 +			if (this.event16Active && this.worldObj.getWorldTime() % 40 == 0) {
 +				boolean anyPlayerInRoom = false;
-+				for (EntityPlayerMP player : playerSPList) {
++				for (Object obj : playerSPList) {
++					if (!(obj instanceof EntityPlayerMP)) continue;
++					EntityPlayerMP player = (EntityPlayerMP) obj;
 +					double dx = player.posX - this.event16StartX;
 +					double dz = player.posZ - this.event16StartZ;
 +					double dy = player.posY - this.event16StartY;
