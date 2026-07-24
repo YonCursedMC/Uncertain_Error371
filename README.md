@@ -26,7 +26,7 @@
 - Crashes may occur, but this is by design.
 - Windows PC is recommended. Some strange things may not happen on Android.
 - Sometimes it behaves strangely, so use at your own risk.
-- We are using JNA(Java Native Access). Please play with caution as something crazy can happen. (Please rest assured that the worst-case scenario will not occur.)
+- This is using JNA(Java Native Access). Please play with caution as something crazy can happen. (Please rest assured that the worst-case scenario will not occur.)
 
 
 ## 動かし方
