@@ -85,7 +85,8 @@ https://elevenlabs.io/<br>
 - かずぎつね様
 ### ツール(AI)
 - Antigravity
-ありがとうございます！
+
+ありがとうございます！<br>
 
 ## Credits
 Credits
