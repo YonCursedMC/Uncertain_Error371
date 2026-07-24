@@ -5266,7 +5266,7 @@
 +
 +    @Override
 +    public String getTexture() {
-+        return "/addmob/oee.png";
++        return "/addmob/That_Thing.png";
 +    }
 +
 +    // NBTへの保存を無効化（ワールド再ロード時に残留しないように）
