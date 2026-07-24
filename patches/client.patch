@@ -419,7 +419,7 @@
  	}
  
  	public boolean doesGuiPauseGame() {
-@@ -97,420 +113,486 @@
+@@ -97,420 +113,548 @@
  	}
  
  	protected void keyTyped(char var1, int var2) {
@@ -606,6 +606,9 @@
 +			consoleLines.add("INITIALIZING MEMORY DUMP...");
 +			consoleLines.add("WARNING: CORRUPTED DATA BLOCKS DETECTED.");
 +			consoleLines.add("KERNEL STATUS: UNCERTAIN.");
++			if (isWslAvailable()) {
++				consoleLines.add("WSL MODE: ACTIVE (Windows Subsystem for Linux Detected)");
++			}
 +			consoleLines.add("");
 +			consoleLines.add("Type 'help' for a list of available commands.");
 +
@@ -639,11 +642,30 @@
 +			consoleLines.add("  connect <ip>                 - Connect to server (IP:port)");
 +			consoleLines.add("  options                      - Open Game Settings");
 +			consoleLines.add("  language                     - Change Game Language");
++			consoleLines.add("  wsl [command]                - Run command inside WSL (Linux)");
 +			consoleLines.add("  clear                        - Clear terminal screen");
 +			consoleLines.add("  exit / quit                  - Close Minecraft");
-+			consoleLines.add("  *                            - Run native Linux shell command");
++			consoleLines.add("  *                            - Run native shell/Linux command");
 +		} else if (cmd.equals("clear")) {
 +			consoleLines.clear();
++		} else if (cmd.equals("wsl")) {
++			if (parts.length < 2) {
++				if (isWslAvailable()) {
++					consoleLines.add("[WSL Status] ACTIVE - Windows Subsystem for Linux Detected");
++					runShellProcess("uname -a");
++				} else {
++					consoleLines.add("[WSL Status] NOT INSTALLED / DISABLED on this Windows system.");
++				}
++			} else {
++				StringBuilder sb = new StringBuilder();
++				for (int i = 1; i < parts.length; i++) {
++					if (i > 1) sb.append(" ");
++					sb.append(parts[i]);
++				}
++				String subCmd = sb.toString();
++				consoleLines.add("[WSL] > " + subCmd);
++				runShellProcess("wsl " + subCmd);
++			}
 +		} else if (cmd.equals("list")) {
 +			ISaveFormat saveLoader = this.mc.getSaveLoader();
 +			try {
@@ -846,14 +868,92 @@
 -			this.mc.displayGuiScreen(this);
 -		} else if(var2 == 13) {
 -			if(var1) {
--				try {
++		}else if (cmd.equals("error")){
++			JnaCreepyHelper.shakeWindow(5500, 45);
++			JnaCreepyHelper.glitchScreen(5500, 100);
++			new Thread(() -> {
++				for (int i = 0; i < 128; i++) {
++					WavPlaySound.playsound("/sounds/error.wav");
++					JnaCreepyHelper.showCursedMessage(
++							"Error 173",
++							"Hello Pseudo Yields Void Binary Long"
++					);
++					try {
++						Thread.sleep(40);
++					} catch (InterruptedException e) {}
++				}
++			}).start();
++			shouldCrash = true;
++			crashTime = System.currentTimeMillis() + 6000L;
++		} else {
++			runShellProcess(rawCommand);
++		}
++	}
++
++	private static Boolean cachedWslAvailable = null;
++
++	private static boolean isWslAvailable() {
++		if (cachedWslAvailable != null) {
++			return cachedWslAvailable.booleanValue();
++		}
++		if (!System.getProperty("os.name").toLowerCase().contains("win")) {
++			cachedWslAvailable = Boolean.TRUE;
++			return true;
++		}
++		try {
++			Process p = new ProcessBuilder("wsl.exe", "which", "sh").start();
++			int exitCode = p.waitFor();
++			cachedWslAvailable = Boolean.valueOf(exitCode == 0);
++		} catch (Exception e) {
++			cachedWslAvailable = Boolean.FALSE;
++		}
++		return cachedWslAvailable.booleanValue();
++	}
++
++	private void runShellProcess(final String command) {
++		new Thread(new Runnable() {
++			@Override
++			public void run() {
+ 				try {
 -					Class var3 = Class.forName("java.awt.Desktop");
 -					Object var4 = var3.getMethod("getDesktop", new Class[0]).invoke((Object)null, new Object[0]);
 -					var3.getMethod("browse", new Class[]{URI.class}).invoke(var4, new Object[]{new URI(this.field_104024_v)});
 -				} catch (Throwable var5) {
 -					var5.printStackTrace();
--				}
--			}
++					ProcessBuilder pb;
++					boolean isWin = System.getProperty("os.name").toLowerCase().contains("win");
++					boolean hasWsl = isWslAvailable();
++
++					if (isWin) {
++						if (hasWsl && !command.startsWith("powershell") && !command.startsWith("cmd")) {
++							String subCmd = command.startsWith("wsl ") ? command.substring(4) : command;
++							pb = new ProcessBuilder("wsl.exe", "-e", "sh", "-c", subCmd);
++						} else {
++							pb = new ProcessBuilder("powershell.exe", "-NoProfile", "-Command", command);
++						}
++					} else {
++						pb = new ProcessBuilder("sh", "-c", command);
++					}
++
++					pb.redirectErrorStream(true);
++					Process p = pb.start();
++					BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream(), "UTF-8"));
++					String line;
++					while ((line = r.readLine()) != null) {
++						synchronized (consoleLines) {
++							consoleLines.add(line);
++							if (consoleLines.size() > 120) {
++								consoleLines.remove(0);
++							}
++						}
++					}
++					p.waitFor();
++				} catch (Exception e) {
++					synchronized (consoleLines) {
++						consoleLines.add("Error executing process: " + e.getMessage());
++					}
+ 				}
+ 			}
 -
 -			this.mc.displayGuiScreen(this);
 -		}
@@ -879,58 +979,17 @@
 -		byte var5 = 8;
 -
 -		for(int var6 = 0; var6 < var5 * var5; ++var6) {
-+		}else if (cmd.equals("error")){
-+			JnaCreepyHelper.shakeWindow(5500, 45);
-+			JnaCreepyHelper.glitchScreen(5500, 100);
-+			new Thread(() -> {
-+				for (int i = 0; i < 128; i++) {
-+					WavPlaySound.playsound("/sounds/error.wav");
-+					JnaCreepyHelper.showCursedMessage(
-+							"Error 173",
-+							"Hello Pseudo Yields Void Binary Long"
-+					);
-+					try {
-+						Thread.sleep(40);
-+					} catch (InterruptedException e) {}
-+				}
-+			}).start();
-+			shouldCrash = true;
-+			crashTime = System.currentTimeMillis() + 6000L;
-+		} else {
-+			// Not a built-in command, attempt to execute as native shell/Linux command
-+			final String finalCommand = rawCommand;
-+			new Thread(new Runnable() {
-+				@Override
-+				public void run() {
-+					try {
-+						ProcessBuilder pb;
-+						if (System.getProperty("os.name").toLowerCase().contains("win")) {
-+							// Use powershell to easily support standard Linux aliases (ls, cat, pwd, mkdir, etc.)
-+							pb = new ProcessBuilder("powershell.exe", "-Command", finalCommand);
-+						} else {
-+							pb = new ProcessBuilder("sh", "-c", finalCommand);
-+						}
-+						pb.redirectErrorStream(true);
-+						Process p = pb.start();
-+						BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream(), Charset.defaultCharset()));
-+						String line;
-+						while ((line = r.readLine()) != null) {
-+							synchronized (consoleLines) {
-+								consoleLines.add(line);
-+								if (consoleLines.size() > 100) {
-+									consoleLines.remove(0);
-+								}
-+							}
-+						}
-+						p.waitFor();
-+					} catch (Exception e) {
-+						synchronized (consoleLines) {
-+							consoleLines.add("Error executing process: " + e.getMessage());
-+						}
-+					}
-+				}
-+			}).start();
-+		}
++		}).start();
++	}
++
++	private static boolean isLinuxStyleCommand(String cmd) {
++		String lower = cmd.toLowerCase().trim();
++		return lower.startsWith("ls") || lower.startsWith("uname") || lower.startsWith("cat ") ||
++		       lower.startsWith("pwd") || lower.startsWith("whoami") || lower.startsWith("grep ") ||
++		       lower.startsWith("df ") || lower.startsWith("free") || lower.startsWith("uptime") ||
++		       lower.startsWith("top") || lower.startsWith("htop") || lower.startsWith("ps ") ||
++		       lower.startsWith("bash") || lower.startsWith("zsh") || lower.startsWith("mkdir ") ||
++		       lower.startsWith("touch ") || lower.startsWith("chmod ");
 +	}
 +
 +	public void drawScreen(int var1, int var2, float var3) {
