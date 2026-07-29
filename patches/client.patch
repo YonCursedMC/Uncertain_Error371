@@ -3316,7 +3316,7 @@
  			NBTTagCompound var2 = this.stackTagCompound.getCompoundTag("display");
 --- net/minecraft/src/NetClientHandler.java
 +++ net/minecraft/src/NetClientHandler.java
-@@ -995,6 +995,162 @@
+@@ -995,6 +995,161 @@
  	}
  
  	public void handleCustomPayload(Packet250CustomPayload var1) {
@@ -3383,9 +3383,8 @@
 +					if (argument.equals("BedrockChaser")) {
 +						//WavPlaySound.playsound("/sounds/event10.wav", duration, true);
 +					} else if (argument.equals("SpawnChaser")) {
-+						WavPlaySound.playsound("/sounds/event11.wav", duration, true);
++						//WavPlaySound.playsound("/sounds/event11.wav", duration, true);
 +					} else if (argument.equals("TriggerCrash")) {
-+						
 +						new Thread(() -> {
 +							for (int i = 0; i < 100; i++) {
 +								try {
